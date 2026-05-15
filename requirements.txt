@@ -1,0 +1,3 @@
+# RepoQuest dependencies
+# References the Streamlit Cloud deployment requirements
+-r infra/streamlit/requirements.txt

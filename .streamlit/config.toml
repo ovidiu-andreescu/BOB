@@ -1,0 +1,9 @@
+[server]
+maxUploadSize = 25
+headless = true
+
+[client]
+showErrorDetails = false
+
+[theme]
+base = "light"
