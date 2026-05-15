@@ -31,18 +31,17 @@ Create the required repository shape and make the local app launchable.
 
 ## Additional Fixes Missed In The Initial Checkpoint
 
-- `infra/local/` was not created.
+- `infra/local/` is only partially created. `infra/local/requirements-dev.txt` exists, but the local README, Streamlit config, and shell/PowerShell runners are still missing.
 - `infra/streamlit/streamlit_config.toml` was not created.
 - `infra/streamlit/README.md` was not created.
 - `scripts/sync_streamlit_cloud_config.py` was not created.
-- `tests/` and `tests/fixtures/` were not created.
+- `tests/` now exists for Milestone 5 graph tests, but `tests/fixtures/` is still missing.
 - `docs/bob_usage.md`, `docs/demo_script.md`, and `docs/architecture.md` were not created.
 - `bob_sessions/README.md` was not created.
 - `pyproject.toml` was not created.
 - `scripts/run_local.py` did not include `--server.runOnSave=true`.
 - Streamlit configs did not explicitly disable usage statistics.
 - The root cloud config was not backed by a canonical `infra/streamlit/streamlit_config.toml`.
-- The demo backend test file was not included.
 
 ## Existing File Corrections
 

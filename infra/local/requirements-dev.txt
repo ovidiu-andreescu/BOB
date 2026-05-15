@@ -1,0 +1,2 @@
+-r ../streamlit/requirements.txt
+pytest

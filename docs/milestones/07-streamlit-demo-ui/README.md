@@ -6,6 +6,8 @@ Purpose: track the Streamlit interface and 1-2 minute demo flow work.
 
 Make the app demoable in 1-2 minutes.
 
+The local-demo graph display was introduced early in Milestone 5. This milestone should reorganize the app into the final tabbed demo flow.
+
 ## Required Files
 
 - `app/streamlit_app.py`
@@ -33,3 +35,4 @@ Make the app demoable in 1-2 minutes.
 
 - Judge can understand the product in one short live demo.
 - Main tabs match the required RepoQuest flow.
+- Architecture and dependency graphs render in the Architecture Map tab as part of the final tabbed UI.
