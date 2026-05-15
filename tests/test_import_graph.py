@@ -50,7 +50,7 @@ def test_demo_repo_import_graph():
     print(f"✓ Found {len(edges)} total import edges")
     print(f"✓ Found {len(python_edges)} Python imports")
     print(f"✓ Found {len(ts_edges)} TypeScript imports")
-    print(f"✓ All expected edges present")
+    print("✓ All expected edges present")
 
 
 def test_import_graph_excludes_external_packages():
@@ -65,6 +65,6 @@ def test_import_graph_excludes_external_packages():
         for pkg in external_packages:
             assert pkg not in edge.target.lower(), f"Should not include external package: {pkg}"
     
-    print(f"✓ No external packages in graph")
+    print("✓ No external packages in graph")
 
 # Made with Bob

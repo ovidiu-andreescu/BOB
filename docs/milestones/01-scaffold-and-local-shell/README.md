@@ -2,7 +2,7 @@
 
 Purpose: track scaffold and local launch work for RepoQuest.
 
-Status: partially complete. The current plan is to move on to Milestone 2 first, then return to these scaffold cleanup items when they become necessary for testing, deployment, or final submission.
+Status: implemented enough for local development and later milestones. Remaining public-facing documentation and final submission polish are tracked in Milestones 8 and 9.
 
 ## Goal
 
@@ -29,33 +29,19 @@ Create the required repository shape and make the local app launchable.
 - `README.md`
 - `pyproject.toml`
 
-## Additional Fixes Missed In The Initial Checkpoint
+## Carry Forward
 
-- `infra/local/` is only partially created. `infra/local/requirements-dev.txt` exists, but the local README, Streamlit config, and shell/PowerShell runners are still missing.
-- `infra/streamlit/streamlit_config.toml` was not created.
-- `infra/streamlit/README.md` was not created.
-- `scripts/sync_streamlit_cloud_config.py` was not created.
-- `tests/` now exists for Milestone 5 graph tests, but `tests/fixtures/` is still missing.
-- `docs/bob_usage.md`, `docs/demo_script.md`, and `docs/architecture.md` were not created.
-- `bob_sessions/README.md` was not created.
-- `pyproject.toml` was not created.
-- `scripts/run_local.py` did not include `--server.runOnSave=true`.
-- Streamlit configs did not explicitly disable usage statistics.
-- The root cloud config was not backed by a canonical `infra/streamlit/streamlit_config.toml`.
-
-## Existing File Corrections
-
-- Update `scripts/run_local.py` to pass `--server.runOnSave=true`.
-- Add `[browser] gatherUsageStats = false` to local and cloud Streamlit configs.
-- Make `.streamlit/config.toml` mirror `infra/streamlit/streamlit_config.toml`.
+- Keep `.streamlit/config.toml` mirrored from `infra/streamlit/streamlit_config.toml`.
 - Keep root `requirements.txt` as `-r infra/streamlit/requirements.txt`.
 - Keep runtime dependencies limited to `streamlit`, `pandas`, and `pyyaml` unless a later milestone proves another lightweight dependency is necessary.
+- Prefer `make run`, `make test`, `make lint`, and `make qa` once the Makefile exists.
+- Finish public-facing docs such as `docs/bob_usage.md`, `docs/demo_script.md`, and `docs/architecture.md` in Milestone 8.
 
 ## Checks
 
-- `python scripts/run_local.py` starts the app.
-- `python scripts/sync_streamlit_cloud_config.py --check` or equivalent validates config sync.
-- `ruff check .` can run once dev dependencies exist.
+- `make run` starts the app.
+- `make check-cloud-config` validates config sync.
+- `make qa` runs config validation, lint, and tests.
 
 ## Exit Criteria
 

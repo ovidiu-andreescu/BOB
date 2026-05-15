@@ -1,9 +1,11 @@
 [server]
+port = 8501
 maxUploadSize = 25
+runOnSave = true
 headless = true
 
 [client]
-showErrorDetails = false
+showErrorDetails = true
 
 [theme]
 base = "light"

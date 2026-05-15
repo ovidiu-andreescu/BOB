@@ -2,6 +2,8 @@
 
 Purpose: track onboarding path, component card, and quiz generation work.
 
+Status: implemented for the MVP. Milestone 7 should focus on presentation, navigation, and evidence previews.
+
 ## Goal
 
 Turn static analysis into a guided onboarding journey.
@@ -34,3 +36,10 @@ Turn static analysis into a guided onboarding journey.
 
 - The app feels like an onboarding quest, not just a file table.
 - A new contributor can follow the generated path without needing a chatbot.
+
+## Carry Forward To UI
+
+- Reading path items should open or reference the matching component card when possible.
+- Component cards should include short code examples or evidence snippets where available.
+- Suggested test ideas should feed the dedicated Tests tab.
+- Quiz answer explanations should reference detected files or routes, not invented behavior.

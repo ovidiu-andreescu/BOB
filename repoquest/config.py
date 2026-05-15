@@ -7,6 +7,11 @@ MAX_FILE_SIZE_BYTES = 512_000
 MAX_TEXT_PREVIEW_CHARS = 20_000
 MAX_GRAPH_NODES = 80
 
+# Onboarding generation limits
+MAX_READING_PATH_ITEMS = 9
+MAX_COMPONENT_CARDS = 30
+MAX_QUIZ_QUESTIONS = 8
+
 # Folders to ignore during scanning
 IGNORE_FOLDERS = {
     ".git",

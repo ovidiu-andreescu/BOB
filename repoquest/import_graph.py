@@ -1,6 +1,7 @@
 """Parse imports and build dependency graphs."""
 
 import ast
+import posixpath
 import re
 from pathlib import PurePosixPath
 from repoquest.models import ImportEdge, FileInfo
@@ -53,15 +54,40 @@ def parse_python_imports(file_info: FileInfo, all_files: list[FileInfo]) -> list
         elif isinstance(node, ast.ImportFrom):
             # from module import name
             if node.module:
+                targets = []
+
                 # Handle relative imports
                 if node.level > 0:
-                    target = _resolve_relative_python_import(
-                        file_info.path, node.module or "", node.level, file_map, init_map
-                    )
+                    for alias in node.names:
+                        if alias.name == "*":
+                            continue
+                        alias_module = f"{node.module}.{alias.name}"
+                        target = _resolve_relative_python_import(
+                            file_info.path, alias_module, node.level, file_map, init_map
+                        )
+                        if target and target not in targets:
+                            targets.append(target)
+                    if not targets:
+                        target = _resolve_relative_python_import(
+                            file_info.path, node.module or "", node.level, file_map, init_map
+                        )
+                        if target:
+                            targets.append(target)
                 else:
-                    target = _resolve_python_import(node.module, file_info.path, file_map, init_map)
-                
-                if target:
+                    for alias in node.names:
+                        if alias.name == "*":
+                            continue
+                        target = _resolve_python_import(
+                            f"{node.module}.{alias.name}", file_info.path, file_map, init_map
+                        )
+                        if target and target not in targets:
+                            targets.append(target)
+                    if not targets:
+                        target = _resolve_python_import(node.module, file_info.path, file_map, init_map)
+                        if target:
+                            targets.append(target)
+
+                for target in targets:
                     edges.append(ImportEdge(
                         source=file_info.path,
                         target=target,
@@ -238,14 +264,11 @@ def _resolve_js_ts_import(source_path: str, import_path: str, file_map: dict) ->
     # Use PurePosixPath for repo-relative path manipulation
     source_dir = PurePosixPath(source_path).parent
     
-    # Resolve the import path relative to source directory
-    target_base = source_dir / import_path
-    
-    # Normalize the path (resolve .. and .)
-    try:
-        target_base = PurePosixPath(*target_base.parts)  # Normalize
-    except (ValueError, IndexError):
+    # Resolve the import path relative to source directory and collapse .. segments.
+    normalized = posixpath.normpath(str(source_dir / import_path))
+    if normalized.startswith("../") or normalized == "..":
         return None
+    target_base = PurePosixPath(normalized)
     
     # Try common extensions
     extensions = ['.tsx', '.ts', '.jsx', '.js', '.mjs']

@@ -2,6 +2,8 @@
 
 Purpose: track deterministic framework detection, entry point detection, and project fingerprinting work.
 
+Status: implemented for the MVP. Milestone 7 should now make the findings easier to read in the Overview tab.
+
 ## Goal
 
 Turn file inventory into a clear answer to "what kind of codebase is this?"
@@ -35,3 +37,9 @@ Turn file inventory into a clear answer to "what kind of codebase is this?"
 
 - Overview tab can show project type, confidence, frameworks, entry points, key folders, and warnings.
 - Demo repo fingerprint clearly says it is a React/Vite + FastAPI full-stack web application.
+
+## Carry Forward To UI
+
+- Show framework evidence as short, inspectable claims rather than a raw file dump.
+- Link each entry point to its component card or preview when possible.
+- Keep cautious fallback language for unknown or mixed repos.

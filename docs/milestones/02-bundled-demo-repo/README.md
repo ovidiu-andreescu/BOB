@@ -60,8 +60,9 @@ These are small consistency fixes to make before or during the next Bob pass. Th
 - Keep the demo repo deterministic and self-contained. Do not add real external APIs, account integrations, credentials, or heavyweight dependencies.
 - Keep the demo repo as analysis input only. RepoQuest should not install or execute this demo repo during analysis.
 
-## Carry Forward To Later Milestones
+## Carry Forward To UI And Docs
 
-- Milestone 3 should confirm the scanner safely handles the expanded demo repo file set.
-- Milestone 4 should ensure file roles include `frontend/src/main.tsx` as an entry point, `frontend/tsconfig.json` as config, and `frontend/src/App.css` as style.
-- Milestone 5 should finish resolving all demo frontend/backend import edges.
+- Use the demo repo as the default live-demo path in Milestone 7.
+- Keep the demo repo small enough that code/documentation previews are readable.
+- Use demo files as evidence examples in the Documentation tab and exported report.
+- Keep the demo repo as analysis input only. RepoQuest should not install or execute it.
