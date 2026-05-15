@@ -6,6 +6,8 @@ Purpose: track import graph, route extraction, and architecture map work.
 
 Show how important files connect and where requests enter the app.
 
+This is the milestone where RepoQuest should first generate the tree/graph data for the architecture map and dependency graph.
+
 ## Required Files
 
 - `repoquest/import_graph.py`
@@ -38,3 +40,4 @@ Show how important files connect and where requests enter the app.
 
 - Architecture Map tab shows a human-friendly graph, technical dependency graph, and detected route table.
 - Demo architecture shows the path from frontend page/API client to backend route/service/model.
+- Graph data is ready for the Streamlit UI milestone to render with `st.graphviz_chart`.

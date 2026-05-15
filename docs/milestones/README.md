@@ -33,3 +33,7 @@ Milestone 1 has follow-up scaffold gaps, but the current plan is to continue wit
 
 Continue with `02-bundled-demo-repo/` and return to the deferred Milestone 1 scaffold cleanup when testing, deployment, or final submission requires it.
 
+## Tree/Graph Display Timing
+
+- Milestone 5 creates the underlying architecture map and dependency graph data/DOT rendering helpers.
+- Milestone 7 exposes those graphs in the Streamlit UI through the Architecture Map tab.

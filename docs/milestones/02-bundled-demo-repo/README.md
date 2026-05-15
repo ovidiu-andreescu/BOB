@@ -51,3 +51,18 @@ Provide a small, deterministic React/Vite + FastAPI repo that makes the demo sto
 
 - The bundled demo supports a 1-2 minute live walkthrough.
 - The demo gives later milestones enough evidence for React/Vite detection, FastAPI detection, entry points, route extraction, component cards, reading path, and quiz questions.
+
+## Post-Milestone 2 Follow-Up Fixes
+
+These are small consistency fixes to make before or during the next Bob pass. They are not blockers for moving into Milestone 3, but they should be resolved before final demo polish.
+
+- Update `examples/demo_repos/mini_travel_planner/README.md` so documented API endpoints match the FastAPI router prefix. Use `/api/trips`, `/api/trips/{trip_id}`, and `/api/recommendations`.
+- Make the frontend recommendation-search story truthful and analyzable. Either add a simple `getRecommendations(destination?: string)` function in `frontend/src/services/api.ts` and wire `SearchForm`/`TripsPage` so the destination value reaches that API call, or simplify the demo README so it does not imply working recommendation search.
+- Keep the demo repo deterministic and self-contained. Do not add real external APIs, account integrations, credentials, or heavyweight dependencies.
+- Keep the demo repo as analysis input only. RepoQuest should not install or execute this demo repo during analysis.
+
+## Carry Forward To Later Milestones
+
+- Milestone 3 should confirm the scanner safely handles the expanded demo repo file set.
+- Milestone 4 should ensure file roles include `frontend/src/main.tsx` as an entry point, `frontend/tsconfig.json` as config, and `frontend/src/App.css` as style.
+- Milestone 5 should use the demo imports and FastAPI decorators as fixtures for import graph and route extraction.

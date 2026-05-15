@@ -6,6 +6,8 @@ Purpose: track the Streamlit interface and 1-2 minute demo flow work.
 
 Make the app demoable in 1-2 minutes.
 
+This is the milestone where the tree/graph display should become visible in the running Streamlit app.
+
 ## Required Files
 
 - `app/streamlit_app.py`
@@ -33,3 +35,4 @@ Make the app demoable in 1-2 minutes.
 
 - Judge can understand the product in one short live demo.
 - Main tabs match the required RepoQuest flow.
+- Architecture and dependency graphs render in the Architecture Map tab.
