@@ -32,13 +32,12 @@ Provide a small, deterministic React/Vite + FastAPI repo that makes the demo sto
 - Make the frontend/backend story easy to explain in a 1-2 minute demo.
 - Do not require the demo repo to be installed or executed by RepoQuest.
 
-## Current Gaps To Check
+## Confirmed Milestone 2 Status
 
-- Confirm `backend/tests/test_trips.py` exists.
-- Confirm the demo README explains the app story in a few lines.
-- Confirm frontend files import each other enough to support a useful dependency graph.
-- Confirm backend route files import service/model files enough to support a useful dependency graph.
-- Confirm the route file contains clear FastAPI decorators such as `@router.get`, `@router.post`, and `@router.delete`.
+- Required demo repo files exist, including `backend/tests/test_trips.py`.
+- The demo repo contains React/Vite evidence through `package.json`, `vite.config.ts`, `src/main.tsx`, and `src/App.tsx`.
+- The demo repo contains FastAPI evidence through `backend/main.py`, `backend/routes/trips.py`, and route decorators.
+- Frontend and backend imports are present and are now used by Milestone 5 graph work.
 
 ## Tests/Checks
 
@@ -65,4 +64,4 @@ These are small consistency fixes to make before or during the next Bob pass. Th
 
 - Milestone 3 should confirm the scanner safely handles the expanded demo repo file set.
 - Milestone 4 should ensure file roles include `frontend/src/main.tsx` as an entry point, `frontend/tsconfig.json` as config, and `frontend/src/App.css` as style.
-- Milestone 5 should use the demo imports and FastAPI decorators as fixtures for import graph and route extraction.
+- Milestone 5 should finish resolving all demo frontend/backend import edges.
