@@ -1,0 +1,51 @@
+# Python environments and caches
+.venv/
+venv/
+env/
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage/
+htmlcov/
+
+# Streamlit local-only files
+.streamlit/secrets.toml
+
+# Local environment and secret files
+.env
+.env.*
+!.env.example
+!.env.sample
+.cache/
+.ipynb_checkpoints/
+
+# Node/frontend dependencies and build output
+node_modules/
+dist/
+build/
+.next/
+coverage/
+
+# Local editor and OS files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Logs and temporary files
+*.log
+*.tmp
+*.temp
+tmp/
+temp/
+
+# Archives and generated bundles
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.7z
