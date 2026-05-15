@@ -2,6 +2,8 @@
 
 Purpose: track safe directory and ZIP scanning work.
 
+Status: implemented for the MVP. Keep future UI work aligned with these safety boundaries.
+
 ## Goal
 
 Safely scan local demo repos and uploaded ZIP files without executing or installing anything.
@@ -45,3 +47,9 @@ Safely scan local demo repos and uploaded ZIP files without executing or install
 
 - Upload path is safe enough to enable in the UI.
 - Bad ZIP input fails gracefully without raw tracebacks.
+
+## Carry Forward To UI
+
+- The upload UI should show limits before upload.
+- ZIP errors should be user-friendly and should not expose raw tracebacks in cloud mode.
+- The scanner should remain static-analysis only: no dependency installation, imports, or script execution.

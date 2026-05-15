@@ -37,7 +37,7 @@ def test_fastapi_route_extraction():
         assert route.file_path, "Route should have file_path"
     
     print(f"✓ Found {len(routes)} routes")
-    print(f"✓ All expected /api routes present")
+    print("✓ All expected /api routes present")
     for route in routes:
         print(f"  {route.method} {route.path} -> {route.file_path}")
 
@@ -57,7 +57,7 @@ def test_route_sorting():
         first_root_idx = routes.index(root_routes[0])
         
         assert first_api_idx < first_root_idx, "/api routes should come before root routes"
-        print(f"✓ Routes sorted correctly (/api routes first)")
+        print("✓ Routes sorted correctly (/api routes first)")
 
 
 def test_route_prefix_detection():
@@ -72,6 +72,6 @@ def test_route_prefix_detection():
         if route.path not in ['/', '/health']:  # Skip root routes
             assert route.path.startswith('/api'), f"Route {route.path} should have /api prefix"
     
-    print(f"✓ Router prefixes correctly applied")
+    print("✓ Router prefixes correctly applied")
 
 # Made with Bob

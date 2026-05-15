@@ -6,79 +6,91 @@ from repoquest.config import MAX_GRAPH_NODES
 
 def generate_architecture_map(
     files: list[FileInfo],
-    routes: list[RouteInfo]
+    routes: list[RouteInfo],
 ) -> str:
     """
     Generate a human-friendly architecture map as DOT string.
-    
-    Shows the story: React entry -> App -> Page -> Components/API -> Backend -> Services/Models -> Tests
-    
-    Args:
-        files: List of scanned FileInfo objects
-        routes: List of detected RouteInfo objects
-        
-    Returns:
-        DOT format string for Graphviz
+
+    Shows the story: React entry -> App -> Page -> Components/API -> Backend
+    -> Services/Models -> Tests.
     """
     # Build DOT graph
     lines = [
         'digraph Architecture {',
         '  rankdir=LR;',
         '  node [shape=box, style="rounded,filled", fontcolor="#111111", color="#333333"];',
-        ''
+        "",
     ]
-    
+
     # Define safe, readable colors for each role
     role_colors = {
-        'entrypoint': '#D9ECFF',  # Light blue
-        'frontend_page': '#C8E6C9',  # Light green
-        'frontend_component': '#C8E6C9',  # Light green
-        'api_client': '#FFF9C4',  # Light yellow
-        'backend_route': '#FFCCBC',  # Light orange
-        'backend_service': '#FFCCBC',  # Light orange
-        'model': '#E0E0E0',  # Light gray
-        'test': '#E1BEE7',  # Light purple
+        "entrypoint": "#D9ECFF",
+        "frontend_page": "#C8E6C9",
+        "frontend_component": "#C8E6C9",
+        "api_client": "#FFF9C4",
+        "backend_route": "#FFCCBC",
+        "backend_service": "#FFCCBC",
+        "model": "#E0E0E0",
+        "test": "#E1BEE7",
     }
-    
+
     # Find key files (exclude __init__.py)
     key_files = []
     for file in files:
-        if file.name == '__init__.py':
+        if file.name == "__init__.py":
             continue
-        if file.role in role_colors or file.name in ['main.tsx', 'App.tsx', 'TripsPage.tsx', 'TripCard.tsx', 'SearchForm.tsx', 'api.ts', 'main.py', 'trips.py', 'recommendations.py', 'trip.py', 'test_trips.py']:
+        if file.role in role_colors or file.name in [
+            "main.tsx",
+            "App.tsx",
+            "TripsPage.tsx",
+            "TripCard.tsx",
+            "SearchForm.tsx",
+            "api.ts",
+            "main.py",
+            "trips.py",
+            "recommendations.py",
+            "trip.py",
+            "test_trips.py",
+        ]:
             key_files.append(file)
-    
+
     # Limit to most important files
-    priority_order = ['entrypoint', 'frontend_page', 'frontend_component', 'api_client', 'backend_route', 'backend_service', 'model', 'test']
+    priority_order = [
+        "entrypoint",
+        "frontend_page",
+        "frontend_component",
+        "api_client",
+        "backend_route",
+        "backend_service",
+        "model",
+        "test",
+    ]
     key_files.sort(key=lambda f: (priority_order.index(f.role) if f.role in priority_order else 999, f.path))
     key_files = key_files[:15]
-    
+
     # Add nodes
     for file in key_files:
         label = file.name
-        color = role_colors.get(file.role, '#F5F5F5')
+        color = role_colors.get(file.role, "#F5F5F5")
         lines.append(f'  "{file.path}" [label="{label}", fillcolor="{color}"];')
-    
-    lines.append('')
-    
-    # Add edges based on typical architecture flow
-    file_map = {f.path: f for f in key_files}
-    
+
+    lines.append("")
+
     # Frontend flow
-    main_tsx = next((f for f in key_files if f.name == 'main.tsx'), None)
-    app_tsx = next((f for f in key_files if f.name == 'App.tsx'), None)
-    trips_page = next((f for f in key_files if f.name == 'TripsPage.tsx'), None)
-    trip_card = next((f for f in key_files if f.name == 'TripCard.tsx'), None)
-    search_form = next((f for f in key_files if f.name == 'SearchForm.tsx'), None)
-    api_ts = next((f for f in key_files if f.name == 'api.ts'), None)
-    
+    main_tsx = next((f for f in key_files if f.name == "main.tsx"), None)
+    app_tsx = next((f for f in key_files if f.name == "App.tsx"), None)
+    trips_page = next((f for f in key_files if f.name == "TripsPage.tsx"), None)
+    trip_card = next((f for f in key_files if f.name == "TripCard.tsx"), None)
+    search_form = next((f for f in key_files if f.name == "SearchForm.tsx"), None)
+    api_ts = next((f for f in key_files if f.name == "api.ts"), None)
+
     # Backend flow
-    main_py = next((f for f in key_files if f.name == 'main.py'), None)
-    trips_py = next((f for f in key_files if f.name == 'trips.py'), None)
-    recommendations_py = next((f for f in key_files if f.name == 'recommendations.py'), None)
-    trip_py = next((f for f in key_files if f.name == 'trip.py'), None)
-    test_trips_py = next((f for f in key_files if f.name == 'test_trips.py'), None)
-    
+    main_py = next((f for f in key_files if f.name == "main.py"), None)
+    trips_py = next((f for f in key_files if f.name == "trips.py"), None)
+    recommendations_py = next((f for f in key_files if f.name == "recommendations.py"), None)
+    trip_py = next((f for f in key_files if f.name == "trip.py"), None)
+    test_trips_py = next((f for f in key_files if f.name == "test_trips.py"), None)
+
     # Frontend edges
     if main_tsx and app_tsx:
         lines.append(f'  "{main_tsx.path}" -> "{app_tsx.path}";')
@@ -90,11 +102,11 @@ def generate_architecture_map(
         lines.append(f'  "{trips_page.path}" -> "{search_form.path}";')
     if trips_page and api_ts:
         lines.append(f'  "{trips_page.path}" -> "{api_ts.path}";')
-    
+
     # API call edge (dashed)
     if api_ts and trips_py:
         lines.append(f'  "{api_ts.path}" -> "{trips_py.path}" [style=dashed, color="#0066CC", label="API"];')
-    
+
     # Backend edges
     if main_py and trips_py:
         lines.append(f'  "{main_py.path}" -> "{trips_py.path}";')
@@ -102,13 +114,13 @@ def generate_architecture_map(
         lines.append(f'  "{trips_py.path}" -> "{recommendations_py.path}";')
     if trips_py and trip_py:
         lines.append(f'  "{trips_py.path}" -> "{trip_py.path}";')
-    
+
     # Test edge
     if test_trips_py and main_py:
         lines.append(f'  "{test_trips_py.path}" -> "{main_py.path}";')
-    
-    lines.append('}')
-    
+
+    lines.append("}")
+
     return '\n'.join(lines)
 
 

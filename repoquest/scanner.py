@@ -1,6 +1,7 @@
 """Repository scanner for RepoQuest."""
 
 import os
+import zipfile
 from pathlib import Path
 
 from repoquest.config import (
@@ -12,6 +13,12 @@ from repoquest.config import (
     MAX_TEXT_PREVIEW_CHARS,
 )
 from repoquest.models import FileInfo, RepositorySnapshot
+from repoquest.zip_safety import (
+    validate_zip_file,
+    is_safe_zip_path,
+    safe_read_zip_entry,
+    ZIPSafetyError,
+)
 
 
 def should_ignore_path(path: str) -> bool:
@@ -37,6 +44,24 @@ def should_skip_file(file_path: Path) -> tuple[bool, str | None]:
     return False, None
 
 
+def should_skip_zip_entry(entry_name: str, entry_size: int) -> tuple[bool, str | None]:
+    """Check if a ZIP entry should be skipped. Returns (should_skip, reason)."""
+    # Check if it's a directory
+    if entry_name.endswith("/"):
+        return True, "Directory entry"
+    
+    # Check extension
+    suffix = Path(entry_name).suffix.lower()
+    if suffix in SKIP_EXTENSIONS:
+        return True, f"Binary file ({suffix})"
+    
+    # Check size
+    if entry_size > MAX_FILE_SIZE_BYTES:
+        return True, f"File too large ({entry_size} bytes)"
+    
+    return False, None
+
+
 def extract_text_preview(file_path: Path) -> tuple[str, int]:
     """Extract text preview and line count from a file."""
     try:
@@ -44,6 +69,16 @@ def extract_text_preview(file_path: Path) -> tuple[str, int]:
             content = f.read(MAX_TEXT_PREVIEW_CHARS)
             line_count = content.count("\n") + 1
             return content, line_count
+    except Exception:
+        return "", 0
+
+
+def extract_text_preview_from_bytes(content_bytes: bytes) -> tuple[str, int]:
+    """Extract text preview and line count from bytes."""
+    try:
+        content = content_bytes[:MAX_TEXT_PREVIEW_CHARS].decode("utf-8", errors="replace")
+        line_count = content.count("\n") + 1
+        return content, line_count
     except Exception:
         return "", 0
 
@@ -161,6 +196,114 @@ def scan_directory(directory: Path) -> RepositorySnapshot:
     
     return RepositorySnapshot(
         source_name=directory.name,
+        files=files,
+        total_files_seen=total_seen,
+        total_files_scanned=total_scanned,
+        warnings=warnings,
+    )
+
+
+def scan_zip(zip_path: Path) -> RepositorySnapshot:
+    """Scan a ZIP file and return a repository snapshot.
+    
+    Args:
+        zip_path: Path to the ZIP file
+        
+    Returns:
+        RepositorySnapshot with scanned files and warnings
+        
+    Raises:
+        ZIPSafetyError: If the ZIP fails safety validation
+    """
+    # Validate ZIP safety first
+    validate_zip_file(zip_path)
+    
+    files: list[FileInfo] = []
+    warnings: list[str] = []
+    total_seen = 0
+    total_scanned = 0
+    
+    try:
+        with zipfile.ZipFile(zip_path, "r") as zf:
+            for entry in zf.namelist():
+                total_seen += 1
+                
+                if total_scanned >= MAX_FILES_SCANNED:
+                    warnings.append(f"Reached max file limit ({MAX_FILES_SCANNED}). Some files were not scanned.")
+                    break
+                
+                # Check path safety
+                is_safe, safety_reason = is_safe_zip_path(entry)
+                if not is_safe:
+                    warnings.append(f"Skipped unsafe path '{entry}': {safety_reason}")
+                    continue
+                
+                # Check if path should be ignored
+                if should_ignore_path(entry):
+                    continue
+                
+                # Get entry info
+                try:
+                    info = zf.getinfo(entry)
+                except KeyError:
+                    warnings.append(f"Cannot access ZIP entry '{entry}'")
+                    continue
+                
+                # Check if should skip
+                should_skip, skip_reason = should_skip_zip_entry(entry, info.file_size)
+                
+                entry_path = Path(entry)
+                suffix = entry_path.suffix.lower()
+                language = LANGUAGE_MAP.get(suffix, "Unknown")
+                
+                if should_skip:
+                    files.append(FileInfo(
+                        path=entry,
+                        name=entry_path.name,
+                        suffix=suffix,
+                        size_bytes=info.file_size,
+                        language=language,
+                        role="skipped",
+                        text_preview="",
+                        line_count=0,
+                        skipped=True,
+                        skip_reason=skip_reason,
+                    ))
+                    continue
+                
+                # Read and process file content
+                try:
+                    content_bytes = safe_read_zip_entry(zf, entry, MAX_FILE_SIZE_BYTES)
+                    text_preview, line_count = extract_text_preview_from_bytes(content_bytes)
+                    role = guess_file_role(entry_path)
+                    
+                    files.append(FileInfo(
+                        path=entry,
+                        name=entry_path.name,
+                        suffix=suffix,
+                        size_bytes=info.file_size,
+                        language=language,
+                        role=role,
+                        text_preview=text_preview,
+                        line_count=line_count,
+                        skipped=False,
+                        skip_reason=None,
+                    ))
+                    
+                    total_scanned += 1
+                except ZIPSafetyError as e:
+                    warnings.append(f"Cannot read '{entry}': {e}")
+                    continue
+    
+    except zipfile.BadZipFile as e:
+        raise ZIPSafetyError(f"Corrupted ZIP file: {e}")
+    except Exception as e:
+        if isinstance(e, ZIPSafetyError):
+            raise
+        raise ZIPSafetyError(f"ZIP scanning failed: {e}")
+    
+    return RepositorySnapshot(
+        source_name=zip_path.name,
         files=files,
         total_files_seen=total_seen,
         total_files_scanned=total_scanned,
