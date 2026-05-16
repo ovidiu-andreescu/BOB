@@ -1,24 +1,134 @@
 # RepoQuest Milestones
 
-This directory tracks the small, testable milestones for building RepoQuest as a local-demo-first Streamlit MVP.
+This directory tracks RepoQuest across two product stages.
 
-RepoQuest should remain deterministic, static-analysis based, and demo-focused. Do not add runtime AI APIs, external agents, account connections, cloud credentials, GitHub OAuth, MCP, vector databases, or heavyweight dependencies.
+## MVP 1 Status
 
-## Current Snapshot
+Milestones 1-9 are complete. The current MVP is fulfilled:
 
-Milestones 1-6 are implemented enough to move the product work forward:
+- Bundled demo repo works.
+- Safe scanning and ZIP handling exist.
+- Framework detection and repo fingerprinting exist.
+- Import graph, route extraction, architecture map, reading path, component cards, quiz, and Markdown export exist.
+- Streamlit UI and public docs exist.
+- Final QA has been completed for the first MVP.
 
-- The required package, demo repo, local runner, dependency files, tests, and Streamlit entry point exist.
-- The bundled `mini_travel_planner` repo supports the React/Vite + FastAPI demo story.
-- Safe directory and ZIP scanning are implemented and covered by tests.
-- Framework detection and repo fingerprinting are implemented.
-- Import graph parsing, route extraction, and graph rendering are implemented.
-- Reading path, component cards, and quiz generation are implemented.
-- `make qa` is the preferred local verification command.
+MVP 1 remains the hackathon-safe deterministic product: no runtime AI, no external agents, no account connections, no cloud credentials, no GitHub OAuth, no MCP, no vector database, and no uploaded-code execution.
 
-The remaining milestone work is productization: reorganize the Streamlit UI, add richer previews and export flows, finish public docs, and complete final QA.
+## MVP 2 Vision
+
+MVP 2 should take RepoQuest from "onboarding report generator" to **RepoQuest Code Assistant Workbench**.
+
+The new product should help a developer improve the application, not only understand where files live:
+
+- The main architecture/dependency graphs show application code only. Test files must not appear in the default graph.
+- Tests become their own useful Test Impact/Quality view.
+- Reading Path shows actual snippets, README/docs excerpts, route decorators, imports, and concrete improvement ideas.
+- The app generates epics, tasks, milestones, and agent-ready workflows for IBM Bob or AI coding agents.
+- UI separates RepoQuest product/about information from analyzed repo/ZIP findings.
+- Documentation generation becomes component-based, like API/reference docs for the scanned repo.
+- Optional AI mode becomes a testable code-assistance layer with schemas, mock providers, eval fixtures, evidence citations, and fail-closed validation.
+
+The guiding rule: deterministic analysis remains the source of truth. AI, when enabled, is an optional synthesis layer that must cite deterministic evidence and pass validation before being shown as trusted guidance.
+
+## MVP 2 Acceptance Criteria
+
+MVP 2 is complete when:
+
+- Main app graphs exclude `test_*.py`, `tests/`, and similar test files by default.
+- Test files appear in Test Impact/Quality views and optional debug graph mode only.
+- Users can select a component/file and see details, evidence, related tests, generated docs, tasks, and workflows.
+- Reading Path includes inline docs/code previews and concrete "understand/improve/ask Bob" guidance.
+- RepoQuest can generate deterministic workflows for AI agents and IBM Bob.
+- Component-based docs are generated from detected routes, models, services, frontend pages/components, tests, and workflows.
+- The UI clearly separates product shell, input/source controls, analysis workspace, generation workspace, and about/meta content.
+- The app exports enhanced workbench findings, docs pages, tasks, workflows, and prompts.
+- Optional assistant mode is disabled by default and does not affect deterministic behavior.
+- Assistant mode, if enabled, uses bounded context packs, structured outputs, mockable providers, validation, and clear AI labeling.
+- Missing secrets, failed AI calls, invalid AI output, nonexistent citations, or missing evidence never break deterministic analysis.
+
+## Planned Interfaces
+
+MVP 2 milestone docs should guide implementation toward these models:
+
+```python
+GraphViewMode = Literal["application", "tests", "all_debug"]
+
+@dataclass
+class ReadingPathDetail:
+    path: str
+    summary: str
+    snippet: str
+    what_to_understand: list[str]
+    improvement_opportunities: list[str]
+    related_tasks: list[str]
+    bob_prompt: str
+
+@dataclass
+class TaskSuggestion:
+    epic: str
+    priority: str
+    files: list[str]
+    evidence: list[str]
+    why: str
+    acceptance_criteria: list[str]
+    suggested_workflow: str
+
+@dataclass
+class AgentWorkflow:
+    title: str
+    goal: str
+    ordered_steps: list[str]
+    files_to_read: list[str]
+    files_to_change: list[str]
+    validation_steps: list[str]
+    expected_output: str
+    prompt: str
+
+@dataclass
+class TestInsight:
+    test_file: str
+    framework: str
+    imports: list[str]
+    likely_targets: list[str]
+    covered_routes: list[str]
+    missing_cases: list[str]
+    suggested_tests: list[str]
+
+@dataclass
+class GeneratedDocPage:
+    title: str
+    category: str
+    source_files: list[str]
+    content: str
+    evidence: list[str]
+    related_components: list[str]
+```
+
+## MVP 2 Build Order
+
+Phase 1 is the no-runtime-AI code assistant workbench:
+
+1. Milestone 10 - Lock MVP 2 direction and product line.
+2. Milestone 11 - Add application-only graph explorer and debug graph modes.
+3. Milestone 12 - Replace path-only reading with evidence-backed reading/workbench previews.
+4. Milestone 13 - Add deterministic epics, tasks, milestones, and agent workflows.
+5. Milestone 14 - Add useful test intelligence and impact/quality views.
+6. Milestone 19 - Improve UI separation and session/workspace state.
+
+Phase 2 is optional testable AI:
+
+1. Milestone 15 - Add disabled-by-default assistant foundation.
+2. Milestone 16 - Add context packs and schema-driven AI summaries/docs/workflows.
+3. Milestone 17 - Add AI epic/task/code recommendations.
+4. Milestone 18 - Add evals, validation, and trust gates.
+5. Milestone 20 - Finalize assistant deployment profiles.
+
+Phase 1 can ship as "MVP 2 deterministic code assistant." Phase 2 can ship as "MVP 2 optional AI assistant."
 
 ## Directory Index
+
+### MVP 1 - Complete
 
 - `01-scaffold-and-local-shell/` - required scaffold, local runner, infra config, and local command shell.
 - `02-bundled-demo-repo/` - React/Vite + FastAPI demo repo used for the live walkthrough.
@@ -30,20 +140,42 @@ The remaining milestone work is productization: reorganize the Streamlit UI, add
 - `08-markdown-export-and-documentation/` - Markdown export and public project docs.
 - `09-polish-and-final-qa/` - final acceptance checks and demo readiness.
 
-## Recommended Next Step
+### MVP 2 - RepoQuest Code Assistant Workbench
 
-Continue with Milestone 7. The app should move from "analysis output exists" to a polished demo workflow with clear tabs, better evidence previews, and explicit test/documentation surfaces.
+- `10-assistant-research-and-product-direction/` - MVP 2 scope and code assistant product line.
+- `11-interactive-graph-explorer/` - application graph explorer with tests excluded by default.
+- `12-evidence-preview-workbench/` - reading path with real snippets, docs previews, and improvement guidance.
+- `13-deterministic-epic-task-finder/` - epics, tasks, milestones, and agent workflow generation.
+- `14-test-intelligence-and-impact-map/` - useful test impact, quality, and missing-case analysis.
+- `15-optional-ai-assistant-foundation/` - disabled-by-default assistant adapter, secrets, schemas, and mock provider.
+- `16-ai-repo-summary-and-context-packs/` - bounded context packs plus AI summaries/docs/workflows.
+- `17-ai-epic-task-and-code-recommendations/` - AI-assisted recommendations grounded in evidence.
+- `18-assistant-evals-and-trust-gates/` - validation and evals for assistant outputs.
+- `19-shareable-workspaces-and-session-state/` - clean UI separation, session state, and exportable workspace state.
+- `20-assistant-mode-deployment-profiles/` - deterministic, local assistant, and hosted assistant profiles.
 
-## Tree/Graph Display Timing
+## Product Guardrails
 
-- Milestone 5 includes the local-demo graph rendering slice.
-- Milestone 7 should reorganize the existing outputs into the final tabbed Streamlit demo UI.
-- Test files should not clutter the main dependency graph. Keep the primary dependency graph focused on application files and move test-specific relationships into a dedicated Tests tab or test section.
+- Do not weaken ZIP safety.
+- Do not execute uploaded code.
+- Do not install uploaded dependencies.
+- Do not send raw full repositories to an AI provider.
+- Do not show test files in the default application graph.
+- Do not hide deterministic findings behind assistant output.
+- Do not make secrets required for the default demo.
+- Do not let assistant failures block the core app.
+- Do not overclaim that RepoQuest fully understands arbitrary codebases.
 
-## Carry-Forward Product Notes
+## Test And Acceptance Plan
 
-- Add a dedicated Tests tab that summarizes detected test files, likely test targets, test framework hints, and suggested next tests.
-- Add documentation/code preview surfaces so judges can see short, safe snippets and generated onboarding text without leaving the app.
-- Add a deterministic "Generate documentation" action for producing the Markdown guide/report from the current analysis result.
-- Include short code examples as evidence, but keep previews capped and avoid showing entire large files.
-- Keep every generated artifact deterministic. No runtime LLMs, agents, credentials, or hidden network calls.
+MVP 2 docs should require tests for:
+
+- Main graph excludes `test_*.py`, `tests/`, and similar test files.
+- Test Impact view includes those same test files.
+- Reading Path renders snippets/previews for README, backend route, frontend page, API client, and test file.
+- Agent workflow generator produces deterministic workflows for the demo repo.
+- Generated component docs include API route pages and component pages.
+- UI state keeps RepoQuest app/about information separate from uploaded ZIP analysis.
+- Mock AI provider returns schema-valid outputs.
+- Invalid AI outputs are rejected or clearly marked unusable.
+- AI recommendations without evidence are not shown as trusted suggestions.

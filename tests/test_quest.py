@@ -1,6 +1,5 @@
 """Tests for component cards and quiz generation."""
 
-import pytest
 
 from repoquest.sample_loader import load_demo_repo
 from repoquest.detectors import generate_fingerprint

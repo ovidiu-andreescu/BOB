@@ -8,7 +8,6 @@ from pathlib import Path
 
 from repoquest.models import (
     RepositorySnapshot,
-    FileInfo,
     FrameworkFinding,
     ProjectFingerprint,
 )

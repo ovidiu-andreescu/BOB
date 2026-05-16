@@ -1,11 +1,10 @@
 """Tests for reading path generation."""
 
-import pytest
 
 from repoquest.sample_loader import load_demo_repo
 from repoquest.detectors import generate_fingerprint
 from repoquest.reading_path import generate_reading_path
-from repoquest.models import RepositorySnapshot, ProjectFingerprint, FileInfo
+from repoquest.models import RepositorySnapshot, ProjectFingerprint
 
 
 def test_reading_path_starts_with_readme():
