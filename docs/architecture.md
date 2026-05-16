@@ -4,15 +4,16 @@ This document describes the architecture and design of RepoQuest.
 
 ## Overview
 
-RepoQuest is a deterministic repository onboarding mapper built with Python and Streamlit. It analyzes small codebases using static analysis and generates guided onboarding documentation.
+RepoQuest is a deterministic repository onboarding mapper built with Python and Streamlit. It analyzes small codebases using static analysis and generates a guided onboarding workspace: overview, application graph, reading workbench, component cards, test intelligence, work plans, quiz, documentation, and export.
 
 ## Design Principles
 
-1. **Deterministic** - All analysis is based on static file scanning, pattern matching, and heuristics. No runtime AI or LLMs.
+1. **Deterministic core** - Core analysis is based on static file scanning, rule evaluation, pattern matching, and heuristics.
 2. **Security-First** - Safe file handling with ZIP validation, path checking, and no code execution.
 3. **Simple** - Readable code, focused modules, minimal dependencies.
 4. **Testable** - Comprehensive unit tests with fixtures and edge case coverage.
 5. **Exportable** - Generate standalone Markdown guides that work without the app.
+6. **Optional AI is separate** - Assistant mode is disabled by default, manual-only, evidence-cited, and never required for deterministic output.
 
 ## Architecture Layers
 
@@ -40,7 +41,8 @@ RepoQuest is a deterministic repository onboarding mapper built with Python and 
 
 **Components:**
 - `repoquest/detectors.py` - Framework and project detection
-- `repoquest/framework_rules.py` - Detection rule definitions
+- `repoquest/indicator_rules.py` - Framework, role, entry point, folder, and project-type rules
+- `repoquest/framework_rules.py` - Compatibility exports for framework rules
 
 **Detection Methods:**
 - File structure patterns (e.g., `frontend/`, `backend/`)
@@ -63,8 +65,10 @@ RepoQuest is a deterministic repository onboarding mapper built with Python and 
 **Analysis Methods:**
 - **Python imports:** AST parsing for accurate import extraction
 - **JS/TS imports:** Regex patterns for `import` and `require` statements
-- **Route extraction:** Pattern matching for FastAPI, Flask, Express decorators
-- **Graph generation:** DOT format for Streamlit visualization
+- **Route extraction:** Pattern matching for FastAPI decorators in MVP 1
+- **Graph generation:** JSON-first graph data rendered to DOT for Streamlit visualization
+- **Graph filtering:** Application mode excludes tests by default; tests and debug modes are explicit
+- **Graph presentation:** Horizontal connected-node view with an embedded legend and evidence-backed API boundary edges
 
 **Output:** `ImportEdge` list, `RouteInfo` list, DOT graphs
 
@@ -75,13 +79,19 @@ RepoQuest is a deterministic repository onboarding mapper built with Python and 
 **Components:**
 - `repoquest/reading_path.py` - Reading path generation
 - `repoquest/quest.py` - Component cards and quiz generation
+- `repoquest/response_templates.py` - Reusable deterministic labels, reasons, understand/improve points, and action text
+- `repoquest/workflows.py` - Deterministic epics, tasks, milestones, and agent workflows
+- `repoquest/test_intelligence.py` - Test inventory, impact mapping, quality signals, and suggested tests
 
 **Generation Logic:**
-- **Reading path:** Priority-based ordering (README → entry points → routes → services → models → frontend → tests)
-- **Component cards:** Role-based card generation with connections, test ideas, and Bob prompts
+- **Reading path:** Priority-based ordering (README -> entry points -> routes -> services -> models -> frontend -> tests)
+- **Reading workbench:** Capped, scrollable file previews with light/dark code viewer controls and fullscreen popup
+- **Component cards:** Role/evidence-based card generation with connections, test ideas, and AI Assistant actions
+- **Test intelligence:** Static test framework detection, import-based likely targets, route coverage inference, and missing-case suggestions
+- **Work plans:** Evidence-backed task suggestions and validation steps for trusted local clones
 - **Quiz:** Repository-specific questions based on structure and detected components
 
-**Output:** `ReadingPathItem` list, `ComponentCard` list, `QuizQuestion` list
+**Output:** `ReadingPathItem` list, `ComponentCard` list, `QuizQuestion` list, `TestIntelligence`, and `WorkPlan`
 
 ### 5. Report Layer
 
@@ -100,10 +110,12 @@ RepoQuest is a deterministic repository onboarding mapper built with Python and 
 - Test file analysis
 - Reading path with snippets
 - Component cards
+- Test intelligence
+- Work plans and agent workflows
 - Documentation previews
 - Onboarding checklist
 - Quiz questions
-- IBM Bob prompts
+- AI Assistant actions
 - Warnings and limitations
 
 **Output:** Markdown string
@@ -118,37 +130,60 @@ RepoQuest is a deterministic repository onboarding mapper built with Python and 
 **UI Features:**
 - Input selection (demo repo or ZIP upload)
 - Analysis trigger and progress
+- Input sidebar hidden after analysis so the workspace focuses on results
+- Simple Refresh control for rerendering current analysis
 - Tabbed result display
-- Interactive graphs with Graphviz
+- Interactive graphs with Graphviz, connected nodes only, and embedded legend
+- Reading workbench with custom code viewer, theme control, capped buffers, and fullscreen popup
 - Quiz with scoring
 - Documentation preview
 - Markdown export with download
+
+### 7. Optional Assistant Layer
+
+**Purpose:** Provide manual AI-assisted synthesis without weakening the deterministic app.
+
+**Components:**
+- `repoquest/assistant_models.py` - Assistant request, response, citation, and run-result models
+- `repoquest/assistant_context.py` - Bounded context builders from deterministic analysis
+- `repoquest/assistant_provider.py` - Disabled, mock, and Claude provider adapters
+- `repoquest/assistant_validation.py` - Citation and safety validation
+
+**Guardrails:**
+- Disabled by default
+- Requires explicit environment or Streamlit secrets configuration
+- Manual button clicks only
+- Sends capped context packs, never full repos
+- Validates citations against scanned files
+- Fails closed without blocking deterministic analysis
 
 ## Data Flow
 
 ```
 User Input (Demo/ZIP)
-  ↓
+ |
 ZIP Safety Validation
-  ↓
+ |
 File Scanning
-  ↓
+ |
 RepositorySnapshot
-  ↓
-Framework Detection → ProjectFingerprint
-  ↓
-Import Parsing → ImportEdge list
-Route Extraction → RouteInfo list
-  ↓
-Architecture Map Generation → DOT graphs
-  ↓
-Reading Path Generation → ReadingPathItem list
-Component Card Generation → ComponentCard list
-Quiz Generation → QuizQuestion list
-  ↓
-Report Generation → Markdown string
-  ↓
+ |
+Framework Detection -> ProjectFingerprint
+ |
+Import Parsing -> ImportEdge list
+Route Extraction -> RouteInfo list
+ |
+Architecture Map Generation -> DOT graphs
+ |
+Reading Path Generation -> ReadingPathItem list
+Component Card Generation -> ComponentCard list
+Quiz Generation -> QuizQuestion list
+ |
+Report Generation -> Markdown string
+ |
 UI Display & Export
+ |
+Optional manual AI action -> bounded context -> provider -> validation -> labeled assistant output
 ```
 
 ## Data Models
@@ -164,6 +199,10 @@ All data models are defined in `repoquest/models.py` as dataclasses:
 - `ReadingPathItem` - Reading path entry
 - `ComponentCard` - Component information card
 - `QuizQuestion` - Quiz question with answer
+- `GraphNode`, `GraphEdge`, `GraphData` - JSON-first graph representation
+- `TaskSuggestion`, `AgentWorkflow`, `SuggestedMilestone`, `WorkPlan` - Deterministic planning output
+- `TestInsight`, `TestIntelligence` - Test inventory and impact output
+- `AssistantRequest`, `AssistantResponse`, `AssistantCitation`, `AssistantRunResult` - Optional assistant output
 
 ## Configuration
 
@@ -199,35 +238,35 @@ Configuration constants are defined in `repoquest/config.py`:
 ### ZIP Upload Safety
 
 1. **Path Validation:**
-   - Reject absolute paths
-   - Reject paths containing `..`
-   - Verify resolved paths stay within target directory
+  - Reject absolute paths
+  - Reject paths containing `..`
+  - Verify resolved paths stay within target directory
 
 2. **Size Limits:**
-   - 25 MB maximum ZIP size
-   - 512 KB maximum per file
-   - 600 file scan limit
+  - 25 MB maximum ZIP size
+  - 512 KB maximum per file
+  - 600 file scan limit
 
 3. **Content Safety:**
-   - Skip binary files
-   - Skip unsupported extensions
-   - Safe UTF-8 decoding with fallback
+  - Skip binary files
+  - Skip unsupported extensions
+  - Safe UTF-8 decoding with fallback
 
 4. **Execution Prevention:**
-   - Never execute uploaded code
-   - Never install dependencies
-   - Never import uploaded modules
+  - Never execute uploaded code
+  - Never install dependencies
+  - Never import uploaded modules
 
-### No Runtime AI
+### Default No-Secret Runtime
 
-RepoQuest does not:
+By default, RepoQuest does not:
 - Call external AI APIs
 - Use LLMs or embeddings
 - Require credentials or secrets
 - Make hidden network requests
 - Store or transmit user data
 
-All analysis is local, deterministic, and auditable.
+Core analysis is local, deterministic, and auditable. Optional assistant mode is a separate manual enhancement that requires explicit configuration, sends only bounded context packs, and never blocks deterministic output.
 
 ## Testing Strategy
 
@@ -242,6 +281,10 @@ Each module has corresponding tests in `tests/`:
 - `test_architecture.py` - Graph generation
 - `test_reading_path.py` - Reading path generation
 - `test_quest.py` - Component cards and quiz
+- `test_test_intelligence.py` - Test impact and quality analysis
+- `test_workflows.py` - Deterministic task and workflow generation
+- `test_assistant.py` - Optional assistant providers, validation, and context building
+- `test_deterministic_rules.py` - Rule/template behavior and overfitting guardrails
 - `test_report.py` - Report generation
 
 ### Test Coverage
@@ -263,7 +306,7 @@ Common test data is defined in `tests/fixtures/`:
 
 ### Scanning
 
-- Ignore common large directories (node_modules, .git, etc.)
+- Ignore common large directories (node_modules,.git, etc.)
 - Skip binary files early
 - Limit file preview size
 - Stop at file count limit
@@ -272,8 +315,8 @@ Common test data is defined in `tests/fixtures/`:
 
 - Limit graph nodes to prevent rendering issues
 - Filter test files from main dependency graph
-- Summarize large graphs
-- Use simple DOT format
+- Render connected nodes only
+- Use horizontal DOT graphs with compact embedded legends
 
 ### UI Responsiveness
 
@@ -298,6 +341,7 @@ Common test data is defined in `tests/fixtures/`:
 - No runtime code analysis
 - No dependency resolution
 - No semantic code search
+- Optional AI is not a chatbot and does not replace deterministic findings
 
 ## Future Considerations
 
@@ -312,7 +356,7 @@ Potential improvements (not in current scope):
 
 ## Conclusion
 
-RepoQuest demonstrates that useful repository analysis can be achieved with deterministic static analysis, without requiring runtime AI or complex infrastructure.
+RepoQuest demonstrates that useful repository analysis can be achieved with deterministic static analysis, without requiring runtime AI or complex infrastructure. Optional assistant mode can add synthesis, but the deterministic engine remains the source of truth.
 
 The architecture prioritizes:
 - Security and safety

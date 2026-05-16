@@ -37,22 +37,22 @@ This milestone was originally started early for demo value, then completed after
 Direct analyzer smoke checks should confirm:
 
 - Detected routes:
-  - `GET /api/recommendations`
-  - `GET /api/trips`
-  - `POST /api/trips`
-  - `DELETE /api/trips/{trip_id}`
-  - `GET /`
-  - `GET /health`
+ - `GET /api/recommendations`
+ - `GET /api/trips`
+ - `POST /api/trips`
+ - `DELETE /api/trips/{trip_id}`
+ - `GET /`
+ - `GET /health`
 - Import graph includes the expected application edges:
-  - `frontend/src/main.tsx -> frontend/src/App.tsx`
-  - `frontend/src/App.tsx -> frontend/src/pages/TripsPage.tsx`
-  - `frontend/src/pages/TripsPage.tsx -> frontend/src/components/TripCard.tsx`
-  - `frontend/src/pages/TripsPage.tsx -> frontend/src/components/SearchForm.tsx`
-  - `frontend/src/pages/TripsPage.tsx -> frontend/src/services/api.ts`
-  - `backend/main.py -> backend/routes/trips.py`
-  - `backend/routes/trips.py -> backend/models/trip.py`
-  - `backend/routes/trips.py -> backend/services/recommendations.py`
-  - `backend/tests/test_trips.py -> backend/main.py`
+ - `frontend/src/main.tsx -> frontend/src/App.tsx`
+ - `frontend/src/App.tsx -> frontend/src/pages/TripsPage.tsx`
+ - `frontend/src/pages/TripsPage.tsx -> frontend/src/components/TripCard.tsx`
+ - `frontend/src/pages/TripsPage.tsx -> frontend/src/components/SearchForm.tsx`
+ - `frontend/src/pages/TripsPage.tsx -> frontend/src/services/api.ts`
+ - `backend/main.py -> backend/routes/trips.py`
+ - `backend/routes/trips.py -> backend/models/trip.py`
+ - `backend/routes/trips.py -> backend/services/recommendations.py`
+ - `backend/tests/test_trips.py -> backend/main.py`
 - Architecture and dependency DOT generation compile successfully.
 - Displayed graph DOT should not include `__init__.py` nodes as primary graph nodes.
 
@@ -79,7 +79,7 @@ app.include_router(trips.router, prefix="/api", tags=["trips"])
 ```python
 @router.get("/trips")
 async def list_trips():
-    ...
+ ...
 ```
 
 ```tsx
@@ -92,8 +92,12 @@ Do not display full files. Cap previews and show the file path plus line context
 ## Additional Suggestions
 
 - Add a small graph summary below the visual graph, for example:
-  `main.tsx -> App.tsx -> TripsPage.tsx -> api.ts -> backend/routes/trips.py`.
+ `main.tsx -> App.tsx -> TripsPage.tsx -> api.ts -> backend/routes/trips.py`.
 - Add a legend explaining colors and the dashed API boundary edge.
+- Keep legend labels short enough to fit in the graph.
+- Show the dashed API boundary legend only when an API boundary edge is rendered.
+- Render connected nodes only in the primary graph so unrelated config/docs files do not float as orphan nodes.
+- Prefer horizontal graph layout for the demo because it uses the available widescreen space better.
 - Add route evidence text, such as `@router.get("/trips")`, in the route table or a route-detail expander.
 - Keep root/health routes in the route table, but visually group or sort them after feature routes.
 - Add a "Show tests separately" treatment so `backend/tests/test_trips.py -> backend/main.py` appears in Tests, not as a distracting main dependency edge.
@@ -101,7 +105,7 @@ Do not display full files. Cap previews and show the file path plus line context
 
 ## Acceptance Criteria
 
-- Clicking "Generate Onboarding Quest" locally shows file inventory, architecture map, dependency graph, detected routes, and import statistics.
+- Clicking "Generate Quest" locally shows file inventory, architecture map, dependency graph, detected routes, and import statistics.
 - Graph nodes render with readable labels and no blacked-out blocks.
 - `__init__.py` files do not appear as primary graph nodes.
 - Import statistics show nonzero Python and JS/TS local imports.

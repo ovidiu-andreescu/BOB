@@ -32,7 +32,7 @@ The extra Tests and Documentation tabs are intentional:
 ## Implementation Tasks
 
 - Add input mode for demo repo and ZIP upload.
-- Add a single "Generate Onboarding Quest" action.
+- Add a single "Generate Quest" action.
 - Add tabs: Overview, Architecture Map, Reading Path, Components, Tests, Quest & Quiz, Documentation, Export, Built with IBM Bob.
 - Show limits in the sidebar.
 - Keep the first result screen focused on project type and framework evidence.
@@ -80,9 +80,9 @@ main.tsx -> App.tsx -> TripsPage.tsx -> api.ts -> backend/routes/trips.py
 
 ### Components
 
-- Role filter.
+- Role grouping or filtering if useful for scanning.
 - Expandable component cards.
-- Connections, detected routes/items, test ideas, and Bob-ready prompts.
+- Connections, detected routes/items, test ideas, and optional assistant actions.
 - Short code snippets for evidence where available.
 
 Example card preview:
@@ -124,7 +124,7 @@ Suggested next tests: missing destination, delete nonexistent trip, recommendati
 - Documentation/config preview table.
 - Generated onboarding guide preview.
 - "Generate documentation" button that refreshes the deterministic Markdown output.
-- Optional "copy Bob prompt" controls for follow-up prompts, if Streamlit supports it cleanly.
+- Optional "copy AI Assistant action" controls for follow-up prompts, if Streamlit supports it cleanly.
 
 ### Export
 
@@ -136,7 +136,7 @@ Suggested next tests: missing destination, delete nonexistent trip, recommendati
 
 - Summarize how Bob helped during development.
 - Link/reference `docs/bob_usage.md` and `bob_sessions/`.
-- State clearly that RepoQuest does not use Bob, Codex, or external AI at runtime.
+- State clearly that RepoQuest does not use Bob or external AI tools at runtime.
 
 ## Tests/Checks
 

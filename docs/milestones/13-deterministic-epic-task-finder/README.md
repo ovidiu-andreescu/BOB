@@ -15,24 +15,24 @@ This is a key hackathon differentiator: RepoQuest should not only explain a repo
 ```python
 @dataclass
 class TaskSuggestion:
-    epic: str
-    priority: str
-    files: list[str]
-    evidence: list[str]
-    why: str
-    acceptance_criteria: list[str]
-    suggested_workflow: str
+  epic: str
+  priority: str
+  files: list[str]
+  evidence: list[str]
+  why: str
+  acceptance_criteria: list[str]
+  suggested_workflow: str
 
 @dataclass
 class AgentWorkflow:
-    title: str
-    goal: str
-    ordered_steps: list[str]
-    files_to_read: list[str]
-    files_to_change: list[str]
-    validation_steps: list[str]
-    expected_output: str
-    prompt: str
+  title: str
+  goal: str
+  ordered_steps: list[str]
+  files_to_read: list[str]
+  files_to_change: list[str]
+  validation_steps: list[str]
+  expected_output: str
+  prompt: str
 ```
 
 ## Workflow Types

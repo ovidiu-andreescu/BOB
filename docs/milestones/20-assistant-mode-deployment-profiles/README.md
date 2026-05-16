@@ -13,7 +13,8 @@ Avoid confusing the no-secret deterministic app with AI-assisted code assistant 
 ### Deterministic Code Assistant Profile
 
 - No secrets.
-- No runtime AI.
+- No required runtime AI.
+- Optional AI disabled.
 - Streamlit Community Cloud compatible.
 - Bundled demo repo works.
 - Application graph excludes tests by default.

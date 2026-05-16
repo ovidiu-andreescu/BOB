@@ -17,23 +17,23 @@ Generate AI-assisted epics, tasks, workflows, test plans, documentation plans, a
 - Test plans.
 - Component documentation plans.
 - Code recommendation cards.
-- Copyable IBM Bob prompts.
+- Copyable AI Assistant actions.
 
 ## Recommendation Schema
 
 ```python
 @dataclass
 class CodeRecommendation:
-    title: str
-    category: str
-    priority: str
-    files: list[str]
-    evidence: list[str]
-    rationale: str
-    proposed_change_summary: str
-    test_plan: list[str]
-    workflow: str
-    confidence: float
+  title: str
+  category: str
+  priority: str
+  files: list[str]
+  evidence: list[str]
+  rationale: str
+  proposed_change_summary: str
+  test_plan: list[str]
+  workflow: str
+  confidence: float
 ```
 
 ## Guardrails
@@ -50,7 +50,7 @@ class CodeRecommendation:
 - Add an Assistant Recommendations view only when assistant mode is enabled.
 - Group recommendations by epic, task type, and priority.
 - Show source evidence next to every recommendation.
-- Provide copyable agent workflows and Bob prompts.
+- Provide copyable agent workflows and AI Assistant actions.
 - Show validation status for AI outputs.
 - Make it obvious which items are deterministic and which are AI-assisted.
 

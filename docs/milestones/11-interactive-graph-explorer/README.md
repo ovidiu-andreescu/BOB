@@ -6,7 +6,7 @@ MVP 2 phase: Deterministic Code Assistant.
 
 ## Goal
 
-Users should select an application file/component and immediately see its role, evidence, docs, related tests, tasks, workflows, and assistant prompts.
+Users should inspect the application graph, switch between application/tests/debug modes, and select a file/component to see role, metadata, dependencies, routes, related tests, and optional assistant actions.
 
 ## Graph Modes
 
@@ -28,7 +28,10 @@ GraphViewMode = Literal["application", "tests", "all_debug"]
 - The graph model should be JSON-first, with DOT as a renderer/fallback.
 - Each node id maps to `FileInfo.path`.
 - Each edge includes source, target, kind, confidence, evidence, and `is_test_edge`.
-- The UI should provide filters for frontend, backend, API, models, docs, config, and unknown files.
+- The UI exposes view mode and max-node controls only. Role filtering remains internal and is not shown in the product UI.
+- The rendered graph shows connected nodes only so config/docs files do not float disconnected from the application story.
+- The DOT graph uses a horizontal layout with an embedded legend. Legend labels must stay short enough to avoid overflow.
+- The dashed API boundary legend appears only when a dashed API edge is actually rendered.
 
 ## Selected Node Panel
 
@@ -36,12 +39,12 @@ Selecting a node should show:
 
 - File path, role, language, and size.
 - Short summary of what the file does.
-- Evidence snippets from imports, route decorators, config, or file content.
 - Incoming and outgoing application dependencies.
 - Related tests from Test Impact data.
-- Generated docs page links.
-- Related tasks and workflows.
-- Bob-ready prompt for this component.
+- Related routes.
+- Optional AI Assistant action for this file.
+
+Code previews do not belong in the Architecture Map inspector. Full file preview and fullscreen reading controls live in the Reading Path workbench.
 
 ## Implementation Notes
 
@@ -54,10 +57,16 @@ Selecting a node should show:
 - Demo repo `backend/tests/test_trips.py` does not appear in default graph output.
 - Demo repo test edge appears in `tests` or `all_debug` mode.
 - Application graph still includes frontend and backend production edges.
+- Application graph has no disconnected orphan nodes.
+- Graph legend includes only roles present in the graph.
+- Tests mode includes a purple Tests legend row when test nodes are present.
+- No stale "Backend route/service" overflow label appears in the legend.
+- Architecture inspector does not show a code preview.
 - Selected node detail can be built for `backend/routes/trips.py`, `frontend/src/pages/TripsPage.tsx`, and `frontend/src/services/api.ts`.
 
 ## Exit Criteria
 
 - The default graph tells the production application story without test noise.
 - Test dependencies are still available in a dedicated graph/view.
-- Selecting a component leads directly to evidence, docs, tasks, workflows, and prompts.
+- Selecting a component leads directly to dependencies, route context, related tests, and optional assistant actions.
+- The input/sidebar controls are hidden after analysis so graph exploration has room on the page.

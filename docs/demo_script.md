@@ -1,7 +1,7 @@
 # RepoQuest Demo Script
 
-**Duration:** 1-2 minutes  
-**Audience:** Hackathon judges  
+**Duration:** 1-2 minutes
+**Audience:** Hackathon judges
 **Goal:** Demonstrate RepoQuest's value proposition and key features
 
 ## Opening (10 seconds)
@@ -20,13 +20,13 @@
 
 ## Analysis (20 seconds)
 
-*Click "Generate Onboarding Quest"*
+*Click "Generate Quest"*
 
-"RepoQuest scans the repository using deterministic static analysis - no AI runtime, no external APIs."
+"RepoQuest scans the repository using deterministic static analysis. The core flow needs no credentials, no external APIs, and never executes uploaded code."
 
 *Wait for analysis to complete (~3-5 seconds)*
 
-"Analysis complete! Let's explore what it found."
+"Analysis complete. The input sidebar is now out of the way so the rest of the screen is focused on the analyzed repo."
 
 ## Overview Tab (15 seconds)
 
@@ -44,11 +44,11 @@
 
 *Navigate to Architecture Map tab*
 
-"Here's a human-friendly architecture map showing how components connect."
+"Here's a human-friendly application graph showing how components connect."
 
 *Point to graph*
 
-"Frontend components call the API client, which connects to backend routes, services, and models."
+"The graph is horizontal, hides disconnected files, and includes an embedded legend. The dashed API boundary appears only when RepoQuest has evidence that a frontend API client references detected backend routes."
 
 *Scroll to routes table*
 
@@ -58,13 +58,13 @@
 
 *Navigate to Reading Path tab*
 
-"Instead of randomly exploring files, RepoQuest suggests a 30-minute reading path."
+"Instead of randomly exploring files, RepoQuest suggests a focused reading path."
 
 *Expand first item*
 
 "Start with the README, then the backend entry point, then routes, services, models, and finally frontend components."
 
-"Each item explains why you should read it and what to look for."
+"Each item explains why you should read it, what to understand, and what could be improved. It also includes a capped, scrollable file preview with light/dark mode and a fullscreen reader."
 
 ## Components Tab (10 seconds)
 
@@ -76,13 +76,13 @@
 
 "This route file connects to the recommendations service and trip model."
 
-"RepoQuest suggests test ideas and even provides an IBM Bob prompt for deeper exploration."
+"RepoQuest suggests test ideas and, when optional AI mode is enabled, provides a manual AI Assistant action for deeper exploration."
 
 ## Tests Tab (10 seconds)
 
 *Navigate to Tests tab*
 
-"RepoQuest identifies test files separately and suggests additional test coverage."
+"RepoQuest identifies test files separately, maps tests to likely targets, detects quality signals, and suggests additional coverage."
 
 "It detected pytest tests and shows what's being tested."
 
@@ -95,6 +95,14 @@
 *Show a question*
 
 "Questions are generated based on the actual repository structure - like 'Which file defines the /trips endpoint?'"
+
+## Work Plans Tab (10 seconds)
+
+*Navigate to Work Plans tab*
+
+"RepoQuest also turns deterministic evidence into epics, tasks, milestones, and agent-ready workflows."
+
+"These are not hardcoded to the demo. They are generated from detected routes, components, tests, models, services, and missing coverage."
 
 ## Documentation Tab (10 seconds)
 
@@ -126,11 +134,11 @@
 
 "Bob helped with scaffolding, implementation, testing, and documentation."
 
-"But here's the key: **RepoQuest doesn't use AI at runtime**."
+"But here's the key: **RepoQuest's core analysis does not depend on AI at runtime**."
 
-"All analysis is deterministic - static file scanning, pattern matching, and heuristics."
+"The default workflow is deterministic - static file scanning, rule evaluation, pattern matching, and heuristics."
 
-"No credentials, no external APIs, no hidden network calls."
+"No credentials are required for the demo. Optional AI Assistant mode is disabled by default and only runs when explicitly configured and clicked."
 
 ## Closing (10 seconds)
 
@@ -147,8 +155,8 @@
 1. **Problem:** Developers waste time figuring out where to start in unfamiliar codebases
 2. **Solution:** Guided onboarding journey with reading path, component cards, and quiz
 3. **Security:** ZIP upload protection, no code execution
-4. **Deterministic:** No runtime AI, all analysis is static and explainable
-5. **Actionable:** Provides specific next steps and IBM Bob prompts
+4. **Deterministic by default:** Core analysis is static, explainable, and does not require AI
+5. **Actionable:** Provides specific next steps, workflows, and optional AI Assistant actions
 6. **Exportable:** Generates standalone Markdown guides
 
 ## Backup Talking Points
@@ -168,7 +176,10 @@ If time allows or questions arise:
 "Cards are generated based on file role, detected routes, imports, and connections. Test ideas are heuristic-based."
 
 ### IBM Bob Integration
-"Bob helped write the code, tests, and docs. The app itself is deterministic and requires no AI at runtime."
+"Bob helped write the code, tests, and docs. The app's core analysis is deterministic and requires no AI at runtime."
+
+### Optional AI Assistant
+"If enabled with a user-provided Claude key, assistant actions can synthesize from bounded context packs. They are manual-only, citation-validated, and never replace deterministic findings."
 
 ## Demo Tips
 
@@ -180,17 +191,17 @@ If time allows or questions arise:
 
 ## Common Questions
 
-**Q: Does it work with large repositories?**  
+**Q: Does it work with large repositories?**
 A: RepoQuest is optimized for small to medium repos (under 600 files). For larger repos, it scans the first 600 files and provides warnings.
 
-**Q: Can it detect custom frameworks?**  
+**Q: Can it detect custom frameworks?**
 A: RepoQuest detects common frameworks. For custom patterns, it falls back to generic file role classification and still provides useful reading paths.
 
-**Q: Is the analysis accurate?**  
+**Q: Is the analysis accurate?**
 A: RepoQuest uses heuristics and shows confidence scores. It's designed as a starting point - developers should verify findings by reading the actual code.
 
-**Q: Why not use AI at runtime?**  
-A: Deterministic analysis is faster, more predictable, requires no credentials, and is fully auditable. IBM Bob helped build it, but the app itself is pure static analysis.
+**Q: Why keep AI optional?**
+A: Deterministic analysis is faster, more predictable, requires no credentials, and is fully auditable. Optional AI Assistant mode can add synthesis when configured, but it is manual-only and grounded in deterministic context.
 
 ---
 
