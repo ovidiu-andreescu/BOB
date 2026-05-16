@@ -1,7 +1,6 @@
 """Tests for test intelligence module."""
 
-import pytest
-from repoquest.models import RepositorySnapshot, FileInfo, RouteInfo, ComponentCard
+from repoquest.models import RepositorySnapshot, FileInfo, RouteInfo
 from repoquest.test_intelligence import (
   get_test_inventory,
   detect_test_framework,

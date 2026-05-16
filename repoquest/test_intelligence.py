@@ -203,7 +203,6 @@ def map_test_to_likely_targets(
   # Fallback: parse imports from text conservatively
   if test_file.text_preview:
     imports = extract_test_imports(test_file)
-    test_dir = "/".join(test_file.path.split("/")[:-1]) # Get test directory
 
     for imp in imports:
       # Parse Python imports: from backend.main import app
@@ -221,8 +220,6 @@ def map_test_to_likely_targets(
 
       # Parse relative imports: import../services/api
       elif "../" in imp or "./" in imp:
-        # Extract path from import
-        import_path = imp.split("from ")[-1].split("import")[0].strip().strip("'\"")
         # Resolve relative to test file location
         # This is simplified - real resolution would need path normalization
         pass # Skip complex relative path resolution for now

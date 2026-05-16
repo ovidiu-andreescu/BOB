@@ -8,6 +8,8 @@ MVP 2 phase: Optional AI Code Assistant.
 
 Generate AI-assisted epics, tasks, workflows, test plans, documentation plans, and code recommendations that a developer or IBM Bob can act on.
 
+This milestone should support cloud providers and local model providers through the same assistant interface.
+
 ## Outputs
 
 - Application summary.
@@ -48,6 +50,7 @@ class CodeRecommendation:
 ## UI Requirements
 
 - Add an Assistant Recommendations view only when assistant mode is enabled.
+- Show which provider produced the output: mock, Claude, local model, or assistant service.
 - Group recommendations by epic, task type, and priority.
 - Show source evidence next to every recommendation.
 - Provide copyable agent workflows and AI Assistant actions.
@@ -57,6 +60,7 @@ class CodeRecommendation:
 ## Tests/Checks
 
 - Mock provider produces schema-valid workflows and code recommendations for the demo repo.
+- Local-model mock/fixture path produces schema-valid workflows and recommendations.
 - Every AI recommendation links to existing file evidence.
 - AI recommendation without evidence is not shown as trusted.
 - AI output referencing nonexistent files is rejected.

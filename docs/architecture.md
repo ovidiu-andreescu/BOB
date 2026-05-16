@@ -130,7 +130,7 @@ RepoQuest is a deterministic repository onboarding mapper built with Python and 
 **UI Features:**
 - Input selection (demo repo or ZIP upload)
 - Analysis trigger and progress
-- Input sidebar hidden after analysis so the workspace focuses on results
+- Persistent input sidebar with source status, upload/generate controls, app limits, and AI Review status
 - Simple Refresh control for rerendering current analysis
 - Tabbed result display
 - Interactive graphs with Graphviz, connected nodes only, and embedded legend

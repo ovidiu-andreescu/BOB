@@ -189,7 +189,7 @@ def generate_task_suggestions(
       "Services contain business logic",
     ]
     if test_files:
-      evidence.append(f"Existing tests found")
+      evidence.append("Existing tests found")
 
     tasks.append(TaskSuggestion(
       epic="Testing & Quality",

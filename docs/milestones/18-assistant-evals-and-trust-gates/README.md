@@ -8,6 +8,8 @@ MVP 2 phase: Optional AI Code Assistant.
 
 Add validation, eval fixtures, and UI trust signals before assistant output is treated as useful.
 
+Evals must work for mock, cloud, async service, and local model providers. CI should rely on deterministic mock fixtures, not live model calls.
+
 ## Trust Gates
 
 - Schema validation.
@@ -30,6 +32,8 @@ Add validation, eval fixtures, and UI trust signals before assistant output is t
 - Repo with scan warnings/skipped files.
 - Repo where mock AI cites nonexistent files.
 - Repo where mock AI omits evidence.
+- Local model style responses with verbose/non-schema text.
+- Async service timeout/error responses.
 
 ## Metrics
 
@@ -43,6 +47,7 @@ Add validation, eval fixtures, and UI trust signals before assistant output is t
 ## Tests/Checks
 
 - Mock malformed assistant output is rejected.
+- Local-model malformed output is rejected.
 - Output referencing nonexistent files is rejected.
 - Output without evidence is downgraded or hidden.
 - Output claiming tests passed without verification is rejected or labeled unsupported.
@@ -54,3 +59,4 @@ Add validation, eval fixtures, and UI trust signals before assistant output is t
 - Failed assistant calls do not break deterministic analysis.
 - The UI clearly shows when a suggestion is AI-assisted and whether it passed evidence checks.
 - AI mode is testable in CI without network access.
+- Provider-specific failures show provider/model labels and do not affect deterministic analysis.

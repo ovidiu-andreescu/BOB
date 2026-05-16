@@ -26,7 +26,7 @@ make run
 
 **Expected Results:**
 - No errors during analysis
-- Input sidebar is hidden after analysis completes
+- Input sidebar remains visible after analysis completes
 - A simple Refresh action is available in the analysis workspace
 - Overview tab shows "Full-stack web application"
 - Confidence score >= 70%
