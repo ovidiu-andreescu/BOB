@@ -6,7 +6,7 @@ Purpose: track the Streamlit interface and 1-2 minute demo flow work.
 
 Make the app demoable in 1-2 minutes.
 
-Milestones 1-6 already produce the core analysis objects. This milestone should turn them into a clean product experience with a focused first screen, tabbed exploration, safe previews, and deterministic documentation generation.
+Milestones 1-6 produced the core analysis objects. This milestone turned them into a clean product experience with a focused first screen, tabbed exploration, safe previews, and deterministic documentation generation.
 
 ## Required Files
 

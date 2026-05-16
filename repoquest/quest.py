@@ -17,7 +17,6 @@ def _find_connected_files(file_info: FileInfo, snapshot: RepositorySnapshot) -> 
     Uses simple heuristics based on imports, path structure, and naming.
     """
     connected = []
-    file_path_lower = file_info.path.lower()
     file_name_base = file_info.name.replace(file_info.suffix, "").lower()
     
     # For backend routes, look for related services and models
@@ -283,7 +282,6 @@ def generate_quiz(
     # Find key files for questions
     entry_points = [f for f in snapshot.files if f.role == "entrypoint" and not f.skipped]
     backend_routes = [f for f in snapshot.files if f.role == "backend_route" and not f.skipped]
-    frontend_pages = [f for f in snapshot.files if f.role == "frontend_page" and not f.skipped]
     api_clients = [f for f in snapshot.files if f.role == "api_client" and not f.skipped]
     models = [f for f in snapshot.files if f.role == "model" and not f.skipped]
     

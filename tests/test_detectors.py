@@ -1,9 +1,7 @@
 """Tests for framework detection and project fingerprinting."""
 
-import pytest
-from pathlib import Path
 
-from repoquest.models import RepositorySnapshot, FileInfo, FrameworkFinding
+from repoquest.models import RepositorySnapshot, FileInfo
 from repoquest.detectors import (
     detect_framework,
     detect_entry_points,
@@ -63,8 +61,6 @@ def test_demo_repo_entry_points():
     fingerprint = generate_fingerprint(snapshot)
     
     # Should have at least one frontend and one backend entry point
-    entry_point_str = " ".join(fingerprint.entry_points)
-    
     assert len(fingerprint.entry_points) >= 2
     assert any("backend" in ep.lower() or "main.py" in ep.lower() for ep in fingerprint.entry_points)
     assert any("frontend" in ep.lower() or "App.tsx" in ep.lower() for ep in fingerprint.entry_points)
