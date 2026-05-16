@@ -20,7 +20,7 @@ Turn static analysis into a guided onboarding journey.
 - Start with `README.md` when present.
 - Prioritize backend entry, routes, services, models, frontend entry, pages, API client, components, and tests for full-stack repos.
 - Generate component/file cards for important files.
-- Include connections, detected routes/items, why it matters, test ideas, and Bob-ready prompts.
+- Include connections, detected routes/items, why it matters, test ideas, and optional assistant action text.
 - Use careful phrases like "likely role" and "detected evidence."
 - Generate 4-8 deterministic quiz questions.
 

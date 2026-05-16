@@ -23,7 +23,7 @@ The app should also make documentation generation feel like part of the product,
 ## Implementation Tasks
 
 - Generate an exportable Markdown onboarding guide.
-- Include summary, detected project type, frameworks, entry points, architecture summary, routes, reading path, component cards, checklist, quiz, Bob prompts, and warnings.
+- Include summary, detected project type, frameworks, entry points, architecture summary, routes, reading path, component cards, checklist, quiz, AI Assistant actions, and warnings.
 - Include a Tests section in the report with detected test files, likely targets, and suggested next tests.
 - Include a Documentation/Previews section in the app that previews README/docs/config snippets and the generated report before download.
 - Add a visible "Generate documentation" button in the UI. The button should use the already computed deterministic analysis result and should not call any runtime AI.
@@ -52,7 +52,6 @@ The app should also make documentation generation feel like part of the product,
 ## Documentation and Config Previews
 ## Onboarding Checklist
 ## Quiz Questions
-## Suggested IBM Bob Prompts
 ## Warnings and Limitations
 ```
 
@@ -69,7 +68,7 @@ Good examples:
 ```python
 @router.get("/trips")
 async def list_trips():
-    ...
+ ...
 ```
 
 ```tsx

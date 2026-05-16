@@ -28,6 +28,7 @@ The new product should help a developer improve the application, not only unders
 - UI separates RepoQuest product/about information from analyzed repo/ZIP findings.
 - Documentation generation becomes component-based, like API/reference docs for the scanned repo.
 - Optional AI mode becomes a testable code-assistance layer with schemas, mock providers, eval fixtures, evidence citations, and fail-closed validation.
+- The UI uses iconized section headers rather than emoji markers, hides the input sidebar after analysis, and keeps source controls separate from the analysis workspace.
 
 The guiding rule: deterministic analysis remains the source of truth. AI, when enabled, is an optional synthesis layer that must cite deterministic evidence and pass validation before being shown as trusted guidance.
 
@@ -37,8 +38,8 @@ MVP 2 is complete when:
 
 - Main app graphs exclude `test_*.py`, `tests/`, and similar test files by default.
 - Test files appear in Test Impact/Quality views and optional debug graph mode only.
-- Users can select a component/file and see details, evidence, related tests, generated docs, tasks, and workflows.
-- Reading Path includes inline docs/code previews and concrete "understand/improve/ask Bob" guidance.
+- Users can select a component/file and see details, dependencies, related routes, related tests, and optional assistant actions.
+- Reading Path includes inline docs/code previews and concrete "understand/improve/assistant action" guidance.
 - RepoQuest can generate deterministic workflows for AI agents and IBM Bob.
 - Component-based docs are generated from detected routes, models, services, frontend pages/components, tests, and workflows.
 - The UI clearly separates product shell, input/source controls, analysis workspace, generation workspace, and about/meta content.
@@ -62,7 +63,7 @@ class ReadingPathDetail:
     what_to_understand: list[str]
     improvement_opportunities: list[str]
     related_tasks: list[str]
-    bob_prompt: str
+    assistant_action: str
 
 @dataclass
 class TaskSuggestion:
@@ -107,7 +108,7 @@ class GeneratedDocPage:
 
 ## MVP 2 Build Order
 
-Phase 1 is the no-runtime-AI code assistant workbench:
+Phase 1 is the deterministic code assistant workbench:
 
 1. Milestone 10 - Lock MVP 2 direction and product line.
 2. Milestone 11 - Add application-only graph explorer and debug graph modes.
@@ -118,8 +119,8 @@ Phase 1 is the no-runtime-AI code assistant workbench:
 
 Phase 2 is optional testable AI:
 
-1. Milestone 15 - Add disabled-by-default assistant foundation.
-2. Milestone 16 - Add context packs and schema-driven AI summaries/docs/workflows.
+1. Milestone 15 - Add disabled-by-default assistant foundation. Complete.
+2. Milestone 16 - Extend context packs and schema-driven AI summaries/docs/workflows.
 3. Milestone 17 - Add AI epic/task/code recommendations.
 4. Milestone 18 - Add evals, validation, and trust gates.
 5. Milestone 20 - Finalize assistant deployment profiles.
@@ -144,10 +145,10 @@ Phase 1 can ship as "MVP 2 deterministic code assistant." Phase 2 can ship as "M
 
 - `10-assistant-research-and-product-direction/` - MVP 2 scope and code assistant product line.
 - `11-interactive-graph-explorer/` - application graph explorer with tests excluded by default.
-- `12-evidence-preview-workbench/` - reading path with real snippets, docs previews, and improvement guidance.
+- `12-evidence-preview-workbench/` - reading path with capped code/doc previews, fullscreen reader, and improvement guidance.
 - `13-deterministic-epic-task-finder/` - epics, tasks, milestones, and agent workflow generation.
 - `14-test-intelligence-and-impact-map/` - useful test impact, quality, and missing-case analysis.
-- `15-optional-ai-assistant-foundation/` - disabled-by-default assistant adapter, secrets, schemas, and mock provider.
+- `15-optional-ai-assistant-foundation/` - disabled-by-default assistant adapter, secrets, validation, Claude provider, and mock provider.
 - `16-ai-repo-summary-and-context-packs/` - bounded context packs plus AI summaries/docs/workflows.
 - `17-ai-epic-task-and-code-recommendations/` - AI-assisted recommendations grounded in evidence.
 - `18-assistant-evals-and-trust-gates/` - validation and evals for assistant outputs.
@@ -165,6 +166,8 @@ Phase 1 can ship as "MVP 2 deterministic code assistant." Phase 2 can ship as "M
 - Do not make secrets required for the default demo.
 - Do not let assistant failures block the core app.
 - Do not overclaim that RepoQuest fully understands arbitrary codebases.
+- Do not add demo-specific file-name logic to production analyzers.
+- Do not show disconnected graph nodes in the primary graph.
 
 ## Test And Acceptance Plan
 

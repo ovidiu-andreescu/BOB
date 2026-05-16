@@ -27,7 +27,8 @@ Use for:
 - ZIP upload.
 - Upload validation status.
 - Source name, scan timestamp, and scan warnings.
-- Reset/new analysis.
+- Initial generate/reset controls before analysis.
+- After analysis, hide the source panel entirely and keep only a simple Refresh action in the workspace.
 
 ### Analysis Workspace
 
@@ -41,6 +42,7 @@ Use for analyzed repo output only:
 - Tasks and Workflows.
 - Generated Docs.
 - Export.
+- Iconized, colored section headers that replace emoji markers while keeping sections easy to scan.
 
 ### Generate Workspace
 
@@ -48,7 +50,7 @@ Use for generated artifacts:
 
 - Documentation pages.
 - Agent workflows.
-- Bob prompts.
+- AI Assistant actions.
 - Export bundles.
 - Optional AI recommendations.
 
@@ -77,6 +79,8 @@ Store:
 
 - Switching from demo repo to ZIP clears stale analysis state.
 - Source/Input state is visually separate from analyzed repo findings.
+- Source/Input controls are not visible after analysis has completed.
+- The analysis workspace exposes a Refresh action, not a "Start Over" action.
 - Built with IBM Bob content is not mixed into repo analysis tabs.
 - Export bundle includes selected components, completed checklist items, tasks, workflows, generated docs, and assistant validation status when present.
 

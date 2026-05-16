@@ -1,521 +1,550 @@
 """Generate comprehensive Markdown onboarding reports."""
 
 from repoquest.models import (
-    RepositorySnapshot,
-    ProjectFingerprint,
-    RouteInfo,
-    ReadingPathItem,
-    ComponentCard,
-    QuizQuestion,
-    FileInfo,
-    ImportEdge,
+  RepositorySnapshot,
+  ProjectFingerprint,
+  RouteInfo,
+  ReadingPathItem,
+  ComponentCard,
+  QuizQuestion,
+  FileInfo,
+  ImportEdge,
+  TestIntelligence,
 )
 
 
 def extract_code_snippet(file_info: FileInfo, pattern: str, max_lines: int = 5) -> str | None:
-    """Extract a short code snippet containing the pattern.
-    
-    Args:
-        file_info: File to extract from
-        pattern: Pattern to search for
-        max_lines: Maximum lines to include in snippet
-        
-    Returns:
-        Code snippet or None if pattern not found
-    """
-    if not file_info.text_preview:
-        return None
-    
-    lines = file_info.text_preview.split('\n')
-    for i, line in enumerate(lines):
-        if pattern in line:
-            start = max(0, i - 1)
-            end = min(len(lines), i + max_lines)
-            snippet = '\n'.join(lines[start:end])
-            if len(snippet) > 300:
-                snippet = snippet[:300] + "..."
-            return snippet
+  """Extract a short code snippet containing the pattern.
+
+  Args:
+    file_info: File to extract from
+    pattern: Pattern to search for
+    max_lines: Maximum lines to include in snippet
+
+  Returns:
+    Code snippet or None if pattern not found
+  """
+  if not file_info.text_preview:
     return None
+
+  lines = file_info.text_preview.split('\n')
+  for i, line in enumerate(lines):
+    if pattern in line:
+      start = max(0, i - 1)
+      end = min(len(lines), i + max_lines)
+      snippet = '\n'.join(lines[start:end])
+      if len(snippet) > 300:
+        snippet = snippet[:300] + "..."
+      return snippet
+  return None
 
 
 def get_test_files(snapshot: RepositorySnapshot) -> list[FileInfo]:
-    """Get all test files from the snapshot."""
-    test_files = []
-    for file_info in snapshot.files:
-        if file_info.skipped:
-            continue
-        if file_info.role == "test" or "/test" in file_info.path or file_info.name.startswith("test_"):
-            test_files.append(file_info)
-    return test_files
+  """Get all test files from the snapshot.
+
+  Excludes __init__.py and empty package marker files.
+  """
+  test_files = []
+  for file_info in snapshot.files:
+    if file_info.skipped:
+      continue
+    # Skip __init__.py files unless they have substantial content
+    if file_info.name == "__init__.py" and file_info.line_count < 50:
+      continue
+    if file_info.role == "test" or "/test" in file_info.path or file_info.name.startswith("test_"):
+      test_files.append(file_info)
+  return test_files
 
 
 def get_doc_files(snapshot: RepositorySnapshot) -> list[FileInfo]:
-    """Get documentation and config files."""
-    doc_files = []
-    doc_extensions = {".md", ".rst", ".txt"}
-    config_extensions = {".json", ".yaml", ".yml", ".toml", ".ini", ".cfg"}
-    
-    for file_info in snapshot.files:
-        if file_info.skipped:
-            continue
-        if file_info.suffix in doc_extensions or file_info.suffix in config_extensions:
-            doc_files.append(file_info)
-    return doc_files
+  """Get documentation and config files."""
+  doc_files = []
+  doc_extensions = {".md", ".rst", ".txt"}
+  config_extensions = {".json", ".yaml", ".yml", ".toml", ".ini", ".cfg"}
+
+  for file_info in snapshot.files:
+    if file_info.skipped:
+      continue
+    if file_info.suffix in doc_extensions or file_info.suffix in config_extensions:
+      doc_files.append(file_info)
+  return doc_files
 
 
 def generate_dependency_summary(snapshot: RepositorySnapshot, edges: list[ImportEdge]) -> str:
-    """Generate a simple dependency path summary."""
-    if not edges:
-        return "No import relationships detected."
-    
-    # Find representative paths from frontend to backend
-    paths = []
-    for edge in edges[:10]:  # Sample first 10 edges
-        if "frontend" in edge.source or "src" in edge.source:
-            if "backend" in edge.target or "routes" in edge.target or "api" in edge.target:
-                paths.append(f"- {edge.source} → {edge.target}")
-    
-    if paths:
-        return "Example dependency paths:\n" + "\n".join(paths[:3])
-    
-    # Fallback: show any edges
-    sample_edges = edges[:3]
-    return "Sample dependencies:\n" + "\n".join(f"- {e.source} → {e.target}" for e in sample_edges)
+  """Generate a simple dependency path summary."""
+  if not edges:
+    return "No import relationships detected."
+
+  # Find representative paths from frontend to backend
+  paths = []
+  for edge in edges[:10]: # Sample first 10 edges
+    if "frontend" in edge.source or "src" in edge.source:
+      if "backend" in edge.target or "routes" in edge.target or "api" in edge.target:
+        paths.append(f"- {edge.source} -> {edge.target}")
+
+  if paths:
+    return "Example dependency paths:\n" + "\n".join(paths[:3])
+
+  # Fallback: show any edges
+  sample_edges = edges[:3]
+  return "Sample dependencies:\n" + "\n".join(f"- {e.source} -> {e.target}" for e in sample_edges)
 
 
 def generate_markdown_report(
-    snapshot: RepositorySnapshot,
-    fingerprint: ProjectFingerprint,
-    routes: list[RouteInfo],
-    reading_path: list[ReadingPathItem],
-    component_cards: list[ComponentCard],
-    quiz: list[QuizQuestion],
-    import_edges: list[ImportEdge] | None = None,
+  snapshot: RepositorySnapshot,
+  fingerprint: ProjectFingerprint,
+  routes: list[RouteInfo],
+  reading_path: list[ReadingPathItem],
+  component_cards: list[ComponentCard],
+  quiz: list[QuizQuestion],
+  import_edges: list[ImportEdge] | None = None,
+  test_intelligence: TestIntelligence | None = None,
 ) -> str:
-    """Generate a comprehensive Markdown onboarding guide.
-    
-    Args:
-        snapshot: Repository snapshot
-        fingerprint: Project fingerprint
-        routes: Detected API routes
-        reading_path: Suggested reading path
-        component_cards: Component cards
-        quiz: Quiz questions
-        import_edges: Optional import edges for dependency summary
-        
-    Returns:
-        Markdown formatted onboarding guide
-    """
-    lines = []
-    
-    # Header
-    lines.append("# RepoQuest Onboarding Guide")
+  """Generate a comprehensive Markdown onboarding guide.
+
+  Args:
+    snapshot: Repository snapshot
+    fingerprint: Project fingerprint
+    routes: Detected API routes
+    reading_path: Suggested reading path
+    component_cards: Component cards
+    quiz: Quiz questions
+    import_edges: Optional import edges for dependency summary
+    test_intelligence: Optional test intelligence data
+
+  Returns:
+    Markdown formatted onboarding guide
+  """
+  lines = []
+
+  # Header
+  lines.append("# RepoQuest Onboarding Guide")
+  lines.append("")
+  lines.append(f"**Repository:** {snapshot.source_name}")
+  lines.append("")
+  lines.append("*Generated by RepoQuest - Deterministic repository onboarding mapper*")
+  lines.append("")
+  lines.append("---")
+  lines.append("")
+
+  # Summary
+  lines.append("## Summary")
+  lines.append("")
+  lines.append(f"**Project Type:** {fingerprint.project_type}")
+  lines.append(f"**Confidence:** {fingerprint.confidence * 100:.0f}%")
+  lines.append("")
+  lines.append(fingerprint.summary)
+  lines.append("")
+
+  # Detected Project Type (detailed)
+  lines.append("## Detected Project Type")
+  lines.append("")
+  lines.append(f"RepoQuest classified this repository as: **{fingerprint.project_type}**")
+  lines.append("")
+  lines.append("This classification is based on deterministic analysis of:")
+  lines.append("- File structure and naming patterns")
+  lines.append("- Framework detection heuristics")
+  lines.append("- Entry point identification")
+  lines.append("- Import/dependency patterns")
+  lines.append("")
+
+  # Frameworks and Evidence
+  if fingerprint.frameworks:
+    lines.append("## Frameworks and Evidence")
     lines.append("")
-    lines.append(f"**Repository:** {snapshot.source_name}")
-    lines.append("")
-    lines.append("*Generated by RepoQuest - Deterministic repository onboarding mapper*")
-    lines.append("")
-    lines.append("---")
-    lines.append("")
-    
-    # Summary
-    lines.append("## Summary")
-    lines.append("")
-    lines.append(f"**Project Type:** {fingerprint.project_type}")
-    lines.append(f"**Confidence:** {fingerprint.confidence * 100:.0f}%")
-    lines.append("")
-    lines.append(fingerprint.summary)
-    lines.append("")
-    
-    # Detected Project Type (detailed)
-    lines.append("## Detected Project Type")
-    lines.append("")
-    lines.append(f"RepoQuest classified this repository as: **{fingerprint.project_type}**")
-    lines.append("")
-    lines.append("This classification is based on deterministic analysis of:")
-    lines.append("- File structure and naming patterns")
-    lines.append("- Framework detection heuristics")
-    lines.append("- Entry point identification")
-    lines.append("- Import/dependency patterns")
-    lines.append("")
-    
-    # Frameworks and Evidence
-    if fingerprint.frameworks:
-        lines.append("## Frameworks and Evidence")
-        lines.append("")
-        
-        for framework in fingerprint.frameworks:
-            lines.append(f"### {framework.name}")
-            lines.append("")
-            lines.append(f"**Category:** {framework.category}")
-            lines.append(f"**Confidence:** {framework.confidence * 100:.0f}%")
-            lines.append("")
-            lines.append("**Evidence:**")
-            for evidence in framework.evidence:
-                lines.append(f"- {evidence}")
-            lines.append("")
-            
-            # Try to find code snippet for framework evidence
-            if framework.evidence:
-                first_evidence = framework.evidence[0]
-                # Extract file path if present
-                if ":" in first_evidence:
-                    file_path = first_evidence.split(":")[0].strip("`")
-                    file_info = next((f for f in snapshot.files if f.path == file_path), None)
-                    if file_info and file_info.text_preview:
-                        # Extract pattern from evidence
-                        if "contains" in first_evidence:
-                            pattern = first_evidence.split("contains")[1].strip().strip("`'\"")
-                            snippet = extract_code_snippet(file_info, pattern, max_lines=3)
-                            if snippet:
-                                lines.append("**Code example:**")
-                                lines.append("```" + file_info.language)
-                                lines.append(snippet)
-                                lines.append("```")
-                                lines.append("")
-    
-    # Key Entry Points
-    if fingerprint.entry_points:
-        lines.append("## Key Entry Points")
-        lines.append("")
-        lines.append("These files are likely starting points for understanding the application:")
-        lines.append("")
-        for entry_point in fingerprint.entry_points:
-            lines.append(f"- `{entry_point}`")
-            
-            # Try to show snippet for entry point
-            file_info = next((f for f in snapshot.files if f.path == entry_point), None)
-            if file_info and file_info.text_preview:
-                # Show first few lines
-                preview_lines = file_info.text_preview.split('\n')[:5]
-                snippet = '\n'.join(preview_lines)
-                if len(snippet) > 200:
-                    snippet = snippet[:200] + "..."
-                lines.append("")
-                lines.append("  **Preview:**")
-                lines.append("  ```" + file_info.language)
-                for line in snippet.split('\n'):
-                    lines.append(f"  {line}")
-                lines.append("  ```")
-        lines.append("")
-    
-    # Key Folders
-    if fingerprint.key_folders:
-        lines.append("## Key Folders")
-        lines.append("")
-        for folder in fingerprint.key_folders:
-            lines.append(f"- `{folder}`")
-        lines.append("")
-    
-    # Architecture Map Summary
-    lines.append("## Architecture Map Summary")
-    lines.append("")
-    lines.append("The repository follows this high-level structure:")
-    lines.append("")
-    
-    # Group files by role
-    role_groups = {}
-    for file_info in snapshot.files:
-        if file_info.skipped:
-            continue
-        role = file_info.role
-        if role not in role_groups:
-            role_groups[role] = []
-        role_groups[role].append(file_info.path)
-    
-    # Show key roles
-    key_roles = ["entrypoint", "frontend_component", "frontend_page", "api_client", 
-                 "backend_route", "backend_service", "model", "test"]
-    
-    for role in key_roles:
-        if role in role_groups:
-            count = len(role_groups[role])
-            lines.append(f"- **{role.replace('_', ' ').title()}:** {count} file(s)")
-    lines.append("")
-    
-    # Routes Detected
-    if routes:
-        lines.append("## Routes Detected")
-        lines.append("")
-        lines.append(f"Found **{len(routes)}** API endpoints:")
-        lines.append("")
-        
-        # Group by framework
-        by_framework = {}
-        for route in routes:
-            if route.framework not in by_framework:
-                by_framework[route.framework] = []
-            by_framework[route.framework].append(route)
-        
-        for framework, framework_routes in by_framework.items():
-            lines.append(f"### {framework.upper()} Routes")
-            lines.append("")
-            for route in framework_routes:
-                func_name = f" (`{route.function_name}`)" if route.function_name else ""
-                lines.append(f"- **{route.method} {route.path}**{func_name}")
-                lines.append(f"  - File: `{route.file_path}`")
-            lines.append("")
-            
-            # Show code snippet for first route
-            if framework_routes:
-                first_route = framework_routes[0]
-                file_info = next((f for f in snapshot.files if f.path == first_route.file_path), None)
-                if file_info and file_info.text_preview:
-                    # Look for route decorator
-                    pattern = f"@{first_route.method.lower()}" if framework == "fastapi" else "@app.route"
-                    snippet = extract_code_snippet(file_info, pattern, max_lines=4)
-                    if snippet:
-                        lines.append("**Example route definition:**")
-                        lines.append("```" + file_info.language)
-                        lines.append(snippet)
-                        lines.append("```")
-                        lines.append("")
-    
-    # Dependency Summary
-    if import_edges:
-        lines.append("## Dependency Summary")
-        lines.append("")
-        summary = generate_dependency_summary(snapshot, import_edges)
-        lines.append(summary)
-        lines.append("")
-        lines.append(f"Total import relationships detected: {len(import_edges)}")
-        lines.append("")
-    
-    # Tests Detected
-    test_files = get_test_files(snapshot)
-    if test_files:
-        lines.append("## Tests Detected")
-        lines.append("")
-        lines.append(f"Found **{len(test_files)}** test files:")
-        lines.append("")
-        
-        for test_file in test_files[:10]:  # Limit to first 10
-            lines.append(f"### {test_file.path}")
-            lines.append("")
-            lines.append(f"- **Language:** {test_file.language}")
-            lines.append(f"- **Lines:** {test_file.line_count}")
-            
-            # Detect test framework
-            if test_file.text_preview:
-                frameworks = []
-                if "pytest" in test_file.text_preview or "def test_" in test_file.text_preview:
-                    frameworks.append("pytest")
-                if "unittest" in test_file.text_preview:
-                    frameworks.append("unittest")
-                if "jest" in test_file.text_preview or "describe(" in test_file.text_preview:
-                    frameworks.append("jest")
-                
-                if frameworks:
-                    lines.append(f"- **Likely framework:** {', '.join(frameworks)}")
-            lines.append("")
-        
-        if len(test_files) > 10:
-            lines.append(f"*... and {len(test_files) - 10} more test files*")
-            lines.append("")
-    
-    # 30-Minute Reading Path
-    if reading_path:
-        lines.append("## 30-Minute Reading Path")
-        lines.append("")
-        total_minutes = sum(item.estimated_minutes for item in reading_path)
-        lines.append(f"Suggested reading order (~{total_minutes} minutes):")
-        lines.append("")
-        
-        for item in reading_path:
-            lines.append(f"### {item.order}. {item.path} ({item.estimated_minutes} min)")
-            lines.append("")
-            lines.append(item.reason)
-            lines.append("")
-            
-            # Show snippet for reading path items
-            file_info = next((f for f in snapshot.files if f.path == item.path), None)
-            if file_info and file_info.text_preview:
-                preview_lines = file_info.text_preview.split('\n')[:4]
-                snippet = '\n'.join(preview_lines)
-                if len(snippet) > 200:
-                    snippet = snippet[:200] + "..."
-                lines.append("**Preview:**")
+
+    for framework in fingerprint.frameworks:
+      lines.append(f"### {framework.name}")
+      lines.append("")
+      lines.append(f"**Category:** {framework.category}")
+      lines.append(f"**Confidence:** {framework.confidence * 100:.0f}%")
+      lines.append("")
+      lines.append("**Evidence:**")
+      for evidence in framework.evidence:
+        lines.append(f"- {evidence}")
+      lines.append("")
+
+      # Try to find code snippet for framework evidence
+      if framework.evidence:
+        first_evidence = framework.evidence[0]
+        # Extract file path if present
+        if ":" in first_evidence:
+          file_path = first_evidence.split(":")[0].strip("`")
+          file_info = next((f for f in snapshot.files if f.path == file_path), None)
+          if file_info and file_info.text_preview:
+            # Extract pattern from evidence
+            if "contains" in first_evidence:
+              pattern = first_evidence.split("contains")[1].strip().strip("`'\"")
+              snippet = extract_code_snippet(file_info, pattern, max_lines=3)
+              if snippet:
+                lines.append("**Code example:**")
                 lines.append("```" + file_info.language)
                 lines.append(snippet)
                 lines.append("```")
                 lines.append("")
-    
-    # Component Cards
-    if component_cards:
-        lines.append("## Component Cards")
+
+  # Key Entry Points
+  if fingerprint.entry_points:
+    lines.append("## Key Entry Points")
+    lines.append("")
+    lines.append("These files are likely starting points for understanding the application:")
+    lines.append("")
+    for entry_point in fingerprint.entry_points:
+      lines.append(f"- `{entry_point}`")
+
+      # Try to show snippet for entry point
+      file_info = next((f for f in snapshot.files if f.path == entry_point), None)
+      if file_info and file_info.text_preview:
+        # Show first few lines
+        preview_lines = file_info.text_preview.split('\n')[:5]
+        snippet = '\n'.join(preview_lines)
+        if len(snippet) > 200:
+          snippet = snippet[:200] + "..."
         lines.append("")
-        lines.append(f"Detailed information about {len(component_cards)} important components:")
-        lines.append("")
-        
-        for card in component_cards:
-            lines.append(f"### {card.title}")
-            lines.append("")
-            lines.append(f"**Path:** `{card.path}`")
-            lines.append("")
-            lines.append(f"**Role:** {card.role}")
-            lines.append("")
-            lines.append(card.why_it_matters)
-            lines.append("")
-            
-            if card.detected_items:
-                lines.append("**Detected items:**")
-                for item in card.detected_items:
-                    lines.append(f"- {item}")
-                lines.append("")
-            
-            if card.connected_to:
-                lines.append("**Connected to:**")
-                for conn in card.connected_to:
-                    lines.append(f"- `{conn}`")
-                lines.append("")
-            
-            if card.suggested_test_ideas:
-                lines.append("**Suggested test ideas:**")
-                for idea in card.suggested_test_ideas:
-                    lines.append(f"- {idea}")
-                lines.append("")
-            
-            lines.append("**IBM Bob prompt:**")
+        lines.append(" **Preview:**")
+        lines.append(" ```" + file_info.language)
+        for line in snippet.split('\n'):
+          lines.append(f" {line}")
+        lines.append(" ```")
+    lines.append("")
+
+  # Key Folders
+  if fingerprint.key_folders:
+    lines.append("## Key Folders")
+    lines.append("")
+    for folder in fingerprint.key_folders:
+      lines.append(f"- `{folder}`")
+    lines.append("")
+
+  # Architecture Map Summary
+  lines.append("## Architecture Map Summary")
+  lines.append("")
+  lines.append("The repository follows this high-level structure:")
+  lines.append("")
+
+  # Group files by role
+  role_groups = {}
+  for file_info in snapshot.files:
+    if file_info.skipped:
+      continue
+    role = file_info.role
+    if role not in role_groups:
+      role_groups[role] = []
+    role_groups[role].append(file_info.path)
+
+  # Show key roles
+  key_roles = ["entrypoint", "frontend_component", "frontend_page", "api_client",
+         "backend_route", "backend_service", "model", "test"]
+
+  for role in key_roles:
+    if role in role_groups:
+      count = len(role_groups[role])
+      lines.append(f"- **{role.replace('_', ' ').title()}:** {count} file(s)")
+  lines.append("")
+
+  # Routes Detected
+  if routes:
+    lines.append("## Routes Detected")
+    lines.append("")
+    lines.append(f"Found **{len(routes)}** API endpoints:")
+    lines.append("")
+
+    # Group by framework
+    by_framework = {}
+    for route in routes:
+      if route.framework not in by_framework:
+        by_framework[route.framework] = []
+      by_framework[route.framework].append(route)
+
+    for framework, framework_routes in by_framework.items():
+      lines.append(f"### {framework.upper()} Routes")
+      lines.append("")
+      for route in framework_routes:
+        func_name = f" (`{route.function_name}`)" if route.function_name else ""
+        lines.append(f"- **{route.method} {route.path}**{func_name}")
+        lines.append(f" - File: `{route.file_path}`")
+      lines.append("")
+
+      # Show code snippet for first route
+      if framework_routes:
+        first_route = framework_routes[0]
+        file_info = next((f for f in snapshot.files if f.path == first_route.file_path), None)
+        if file_info and file_info.text_preview:
+          # Look for route decorator
+          pattern = f"@{first_route.method.lower()}" if framework == "fastapi" else "@app.route"
+          snippet = extract_code_snippet(file_info, pattern, max_lines=4)
+          if snippet:
+            lines.append("**Example route definition:**")
+            lines.append("```" + file_info.language)
+            lines.append(snippet)
             lines.append("```")
-            lines.append(card.suggested_bob_prompt)
-            lines.append("```")
             lines.append("")
-    
-    # Documentation and Config Previews
-    doc_files = get_doc_files(snapshot)
-    if doc_files:
-        lines.append("## Documentation and Config Previews")
+
+  # Dependency Summary
+  if import_edges:
+    lines.append("## Dependency Summary")
+    lines.append("")
+    summary = generate_dependency_summary(snapshot, import_edges)
+    lines.append(summary)
+    lines.append("")
+    lines.append(f"Total import relationships detected: {len(import_edges)}")
+    lines.append("")
+
+  # Tests Detected
+  test_files = get_test_files(snapshot)
+  if test_files:
+    lines.append("## Tests Detected")
+    lines.append("")
+    lines.append(f"Found **{len(test_files)}** test files:")
+    lines.append("")
+
+    for test_file in test_files[:10]: # Limit to first 10
+      lines.append(f"### {test_file.path}")
+      lines.append("")
+      lines.append(f"- **Language:** {test_file.language}")
+      lines.append(f"- **Lines:** {test_file.line_count}")
+
+      # Detect test framework
+      if test_file.text_preview:
+        frameworks = []
+        if "pytest" in test_file.text_preview or "def test_" in test_file.text_preview:
+          frameworks.append("pytest")
+        if "unittest" in test_file.text_preview:
+          frameworks.append("unittest")
+        if "jest" in test_file.text_preview or "describe(" in test_file.text_preview:
+          frameworks.append("jest")
+
+        if frameworks:
+          lines.append(f"- **Likely framework:** {', '.join(frameworks)}")
+      lines.append("")
+
+    if len(test_files) > 10:
+      lines.append(f"*... and {len(test_files) - 10} more test files*")
+      lines.append("")
+
+  # 30-Minute Reading Path
+  if reading_path:
+    lines.append("## 30-Minute Reading Path")
+    lines.append("")
+    total_minutes = sum(item.estimated_minutes for item in reading_path)
+    lines.append(f"Suggested reading order (~{total_minutes} minutes):")
+    lines.append("")
+
+    for item in reading_path:
+      lines.append(f"### {item.order}. {item.path} ({item.estimated_minutes} min)")
+      lines.append("")
+      lines.append(item.reason)
+      lines.append("")
+
+      # Show snippet for reading path items
+      file_info = next((f for f in snapshot.files if f.path == item.path), None)
+      if file_info and file_info.text_preview:
+        preview_lines = file_info.text_preview.split('\n')[:4]
+        snippet = '\n'.join(preview_lines)
+        if len(snippet) > 200:
+          snippet = snippet[:200] + "..."
+        lines.append("**Preview:**")
+        lines.append("```" + file_info.language)
+        lines.append(snippet)
+        lines.append("```")
         lines.append("")
-        
-        # README first
-        readme = next((f for f in doc_files if f.name.lower() == "readme.md"), None)
-        if readme and readme.text_preview:
-            lines.append("### README.md")
-            lines.append("")
-            preview = readme.text_preview[:500]
-            if len(readme.text_preview) > 500:
-                preview += "\n\n... (truncated)"
-            lines.append("```markdown")
-            lines.append(preview)
-            lines.append("```")
-            lines.append("")
-        
-        # Key config files
-        config_names = ["package.json", "requirements.txt", "pyproject.toml", "vite.config.ts"]
-        for config_name in config_names:
-            config_file = next((f for f in doc_files if f.name == config_name), None)
-            if config_file and config_file.text_preview:
-                lines.append(f"### {config_name}")
-                lines.append("")
-                preview = config_file.text_preview[:300]
-                if len(config_file.text_preview) > 300:
-                    preview += "\n... (truncated)"
-                lines.append("```")
-                lines.append(preview)
-                lines.append("```")
-                lines.append("")
-    
-    # Onboarding Checklist
-    lines.append("## Onboarding Checklist")
+
+  # Component Cards
+  if component_cards:
+    lines.append("## Component Cards")
     lines.append("")
-    lines.append("Use this checklist to track your onboarding progress:")
+    lines.append(f"Detailed information about {len(component_cards)} important components:")
     lines.append("")
-    lines.append("- [ ] Read the README to understand project purpose")
-    lines.append("- [ ] Identify the main entry points")
-    lines.append("- [ ] Understand the project structure and key folders")
-    lines.append("- [ ] Review the architecture map")
-    lines.append("- [ ] Follow the suggested reading path")
-    lines.append("- [ ] Explore component cards for important files")
-    lines.append("- [ ] Review test files and coverage")
-    lines.append("- [ ] Complete the quiz to verify understanding")
-    lines.append("- [ ] Set up local development environment")
-    lines.append("- [ ] Run tests successfully")
-    lines.append("")
-    
-    # Quiz Questions
-    if quiz:
-        lines.append("## Quiz Questions")
+
+    for card in component_cards:
+      lines.append(f"### {card.title}")
+      lines.append("")
+      lines.append(f"**Path:** `{card.path}`")
+      lines.append("")
+      lines.append(f"**Role:** {card.role}")
+      lines.append("")
+      lines.append(card.why_it_matters)
+      lines.append("")
+
+      if card.detected_items:
+        lines.append("**Detected items:**")
+        for item in card.detected_items:
+          lines.append(f"- {item}")
         lines.append("")
-        lines.append("Test your understanding of the codebase:")
+
+      if card.connected_to:
+        lines.append("**Connected to:**")
+        for conn in card.connected_to:
+          lines.append(f"- `{conn}`")
         lines.append("")
-        
-        for i, q in enumerate(quiz, 1):
-            lines.append(f"### Question {i}")
-            lines.append("")
-            lines.append(q.question)
-            lines.append("")
-            for opt in q.options:
-                lines.append(f"- {opt}")
-            lines.append("")
-            lines.append(f"**Correct answer:** {q.correct_answer}")
-            lines.append("")
-            lines.append(f"**Explanation:** {q.explanation}")
-            lines.append("")
-    
-    # Suggested IBM Bob Prompts
-    lines.append("## Suggested IBM Bob Prompts")
-    lines.append("")
-    lines.append("Use these prompts with IBM Bob to continue exploring and improving the repository:")
-    lines.append("")
-    
-    # Collect unique Bob prompts from component cards
-    bob_prompts = []
-    for card in component_cards[:5]:  # First 5 cards
-        if card.suggested_bob_prompt:
-            bob_prompts.append(f"**For {card.path}:**")
-            bob_prompts.append("```")
-            bob_prompts.append(card.suggested_bob_prompt)
-            bob_prompts.append("```")
-            bob_prompts.append("")
-    
-    if bob_prompts:
-        lines.extend(bob_prompts)
-    else:
-        lines.append("- Explain the architecture and suggest improvements")
-        lines.append("- Generate comprehensive tests for the main components")
-        lines.append("- Review security considerations and suggest fixes")
-        lines.append("- Suggest performance optimizations")
-        lines.append("- Generate API documentation")
+
+      if card.suggested_test_ideas:
+        lines.append("**Suggested test ideas:**")
+        for idea in card.suggested_test_ideas:
+          lines.append(f"- {idea}")
         lines.append("")
-    
-    # Warnings and Limitations
-    lines.append("## Warnings and Limitations")
+
+  # Documentation and Config Previews
+  doc_files = get_doc_files(snapshot)
+  if doc_files:
+    lines.append("## Documentation and Config Previews")
     lines.append("")
-    
-    if fingerprint.warnings:
-        lines.append("**Analysis Warnings:**")
-        for warning in fingerprint.warnings:
-            lines.append(f"- {warning}")
+
+    # README first
+    readme = next((f for f in doc_files if f.name.lower() == "readme.md"), None)
+    if readme and readme.text_preview:
+      lines.append("### README.md")
+      lines.append("")
+      preview = readme.text_preview[:500]
+      if len(readme.text_preview) > 500:
+        preview += "\n\n... (truncated)"
+      lines.append("```markdown")
+      lines.append(preview)
+      lines.append("```")
+      lines.append("")
+
+    # Key config files
+    config_names = ["package.json", "requirements.txt", "pyproject.toml", "vite.config.ts"]
+    for config_name in config_names:
+      config_file = next((f for f in doc_files if f.name == config_name), None)
+      if config_file and config_file.text_preview:
+        lines.append(f"### {config_name}")
         lines.append("")
-    
-    lines.append("**RepoQuest Limitations:**")
+        preview = config_file.text_preview[:300]
+        if len(config_file.text_preview) > 300:
+          preview += "\n... (truncated)"
+        lines.append("```")
+        lines.append(preview)
+        lines.append("```")
+        lines.append("")
+
+  # Test Intelligence
+  if test_intelligence and test_intelligence.test_insights:
+    lines.append("## Test Intelligence")
     lines.append("")
-    lines.append("RepoQuest uses deterministic static analysis and heuristics. It:")
+    lines.append(f"Found **{len(test_intelligence.test_insights)}** test files.")
     lines.append("")
-    lines.append("- ✅ Scans file structure and content")
-    lines.append("- ✅ Detects common frameworks and patterns")
-    lines.append("- ✅ Extracts imports and routes")
-    lines.append("- ✅ Generates reading paths and component cards")
-    lines.append("- ❌ Does not execute code")
-    lines.append("- ❌ Does not install dependencies")
-    lines.append("- ❌ Does not use runtime AI/LLMs")
-    lines.append("- ❌ May miss custom or uncommon patterns")
+
+    # Test Inventory
+    lines.append("### Test Inventory")
     lines.append("")
-    lines.append("For best results:")
-    lines.append("- Use with small to medium-sized repositories (< 600 files)")
-    lines.append("- Verify findings by reading the actual code")
-    lines.append("- Use IBM Bob for deeper analysis and code generation")
-    lines.append("- Treat this guide as a starting point, not a complete analysis")
+    for insight in test_intelligence.test_insights[:10]: # Limit to first 10
+      lines.append(f"#### {insight.test_file}")
+      lines.append("")
+      lines.append(f"- **Framework:** {insight.framework or 'unknown'}")
+      lines.append(f"- **Likely covers:** {len(insight.likely_targets)} file(s)")
+      lines.append(f"- **Routes tested:** {len(insight.covered_routes)}")
+      lines.append(f"- **Assertions:** {insight.quality_signals.get('assertion_count', 0)}")
+
+      if insight.likely_targets:
+        lines.append("")
+        lines.append("**Likely targets:**")
+        for target in insight.likely_targets[:5]:
+          lines.append(f"- `{target}`")
+
+      if insight.covered_routes:
+        lines.append("")
+        lines.append("**Routes tested:**")
+        for route in insight.covered_routes[:5]:
+          lines.append(f"- `{route}`")
+
+      lines.append("")
+
+    # Missing Coverage
+    if test_intelligence.missing_coverage:
+      lines.append("### Missing Coverage")
+      lines.append("")
+      lines.append("The following items appear untested:")
+      lines.append("")
+      for item in test_intelligence.missing_coverage[:15]:
+        lines.append(f"- `{item}`")
+      lines.append("")
+
+    # Suggested Next Tests
+    if test_intelligence.suggested_tests:
+      lines.append("### Suggested Next Tests")
+      lines.append("")
+      lines.append("Consider adding these test cases:")
+      lines.append("")
+      for suggestion in test_intelligence.suggested_tests[:15]:
+        lines.append(f"- {suggestion}")
+      lines.append("")
+
+  # Onboarding Checklist
+  lines.append("## Onboarding Checklist")
+  lines.append("")
+  lines.append("Use this checklist to track your onboarding progress:")
+  lines.append("")
+  lines.append("- [ ] Read the README to understand project purpose")
+  lines.append("- [ ] Identify the main entry points")
+  lines.append("- [ ] Understand the project structure and key folders")
+  lines.append("- [ ] Review the architecture map")
+  lines.append("- [ ] Follow the suggested reading path")
+  lines.append("- [ ] Explore component cards for important files")
+  lines.append("- [ ] Review test files and coverage")
+  lines.append("- [ ] Complete the quiz to verify understanding")
+  lines.append("- [ ] Set up local development environment")
+  lines.append("- [ ] Run tests successfully")
+  lines.append("")
+
+  # Quiz Questions
+  if quiz:
+    lines.append("## Quiz Questions")
     lines.append("")
-    
-    # Footer
-    lines.append("---")
+    lines.append("Test your understanding of the codebase:")
     lines.append("")
-    lines.append("*This guide was generated by RepoQuest using deterministic static analysis.*")
+
+    for i, q in enumerate(quiz, 1):
+      lines.append(f"### Question {i}")
+      lines.append("")
+      lines.append(q.question)
+      lines.append("")
+      for opt in q.options:
+        lines.append(f"- {opt}")
+      lines.append("")
+      lines.append(f"**Correct answer:** {q.correct_answer}")
+      lines.append("")
+      lines.append(f"**Explanation:** {q.explanation}")
+      lines.append("")
+
+  # Warnings and Limitations
+  lines.append("## Warnings and Limitations")
+  lines.append("")
+
+  if fingerprint.warnings:
+    lines.append("**Analysis Warnings:**")
+    for warning in fingerprint.warnings:
+      lines.append(f"- {warning}")
     lines.append("")
-    lines.append("*No runtime AI, external APIs, or credentials were used.*")
-    lines.append("")
-    
-    return "\n".join(lines)
+
+  lines.append("**RepoQuest Limitations:**")
+  lines.append("")
+  lines.append("RepoQuest uses deterministic static analysis and heuristics. It:")
+  lines.append("")
+  lines.append("- Scans file structure and content")
+  lines.append("- Detects common frameworks and patterns")
+  lines.append("- Extracts imports and routes")
+  lines.append("- Generates reading paths and component cards")
+  lines.append("- Does not execute code")
+  lines.append("- Does not install dependencies")
+  lines.append("- Does not use runtime AI/LLMs")
+  lines.append("- May miss custom or uncommon patterns")
+  lines.append("")
+  lines.append("For best results:")
+  lines.append("- Use with small to medium-sized repositories (< 600 files)")
+  lines.append("- Verify findings by reading the actual code")
+  lines.append("- Use IBM Bob for deeper analysis and code generation")
+  lines.append("- Treat this guide as a starting point, not a complete analysis")
+  lines.append("")
+
+  # Footer
+  lines.append("---")
+  lines.append("")
+  lines.append("*This guide was generated by RepoQuest using deterministic static analysis.*")
+  lines.append("")
+  lines.append("*No runtime AI, external APIs, or credentials were used.*")
+  lines.append("")
+
+  return "\n".join(lines)
 
 # Made with Bob

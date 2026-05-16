@@ -29,13 +29,16 @@ python scripts/run_local.py
 - Oversized ZIP.
 - Empty repo.
 - Unknown/mixed repo.
-- Demo repo after clicking Generate Onboarding Quest twice.
+- Demo repo after clicking Generate Quest twice.
 - ZIP upload after previously analyzing the demo repo.
 - Documentation generation before and after export.
 - Tests tab with a repo that has tests.
 - Tests tab with a repo that has no tests.
 - Documentation preview with README/docs present.
 - Documentation preview with no README/docs present.
+- Analysis workspace after the sidebar/input controls are hidden.
+- Architecture graph in application mode, tests mode, and all-debug mode.
+- Optional AI disabled, enabled without key, and enabled with network/provider error.
 
 ## Acceptance Checks
 
@@ -47,16 +50,19 @@ python scripts/run_local.py
 - FastAPI routes are extracted.
 - Architecture graph renders.
 - Dependency graph or summary renders.
+- Main application graph shows connected nodes only and includes a compact in-graph legend.
 - Reading path appears.
 - Component cards appear.
 - Tests tab appears and keeps test files out of the default dependency graph.
+- Work Plans tab appears and produces deterministic tasks/workflows.
 - Quiz appears.
 - Documentation tab previews generated guide/report content.
 - Generate documentation button works from the current analysis result.
 - Markdown guide downloads.
 - Built with IBM Bob section appears.
 - README and infra docs are complete.
-- No external runtime AI/API/agent dependency exists.
+- No external runtime AI/API/agent dependency is required for the default demo.
+- Optional AI failures never block deterministic analysis.
 
 ## Demo Polish Checklist
 
@@ -64,8 +70,12 @@ python scripts/run_local.py
 - Overview gives framework evidence without forcing the judge to inspect raw file tables.
 - Architecture tab opens on the human-friendly graph, not the technical graph.
 - Dependency graph excludes test files by default.
+- Graph controls are minimal: view mode and max nodes only.
+- The graph legend uses short labels and only documents edge styles that appear.
+- The Architecture Map inspector does not include code previews.
 - Tests tab makes `backend/tests/test_trips.py` useful by showing likely coverage and suggested next tests.
-- Component cards include short code examples or evidence snippets.
+- Component cards include evidence, connections, test ideas, and optional assistant actions.
+- Reading Path includes the code/doc preview experience.
 - Documentation tab shows a generated guide preview and a clear "Generate documentation" action.
 - Export tab downloads the same Markdown shown in preview.
 - Empty states are friendly and do not show tracebacks.
@@ -77,7 +87,8 @@ python scripts/run_local.py
 - Test discovery should not accidentally run the bundled demo repo's own FastAPI tests unless those dependencies are intentionally installed.
 - ZIP handling must remain scan-only. Do not extract blindly, install dependencies, or import uploaded code.
 - Adding previews should not display huge files or binary contents.
-- Adding documentation generation should not introduce runtime AI calls.
+- Adding documentation generation should not introduce automatic AI calls.
+- Optional AI buttons must stay manual-only.
 
 ## Exit Criteria
 

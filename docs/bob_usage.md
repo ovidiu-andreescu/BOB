@@ -6,7 +6,7 @@ This document describes how IBM Bob was used as a development partner throughout
 
 **IBM Bob was used during development, not at runtime.**
 
-RepoQuest does not call IBM Bob, any LLM, or external AI service when analyzing repositories. All analysis is deterministic, based on static file scanning, pattern matching, and heuristics.
+RepoQuest does not call IBM Bob at runtime. Core repository analysis is deterministic, based on static file scanning, rule evaluation, pattern matching, and heuristics. Optional AI Assistant actions can be enabled separately, but they are manual-only and do not replace deterministic findings.
 
 Bob helped write the code, tests, and documentation that make RepoQuest work.
 
@@ -96,8 +96,7 @@ Bob helped write the code, tests, and documentation that make RepoQuest work.
 
 **What Bob helped with:**
 - Implemented FastAPI route detection with decorators
-- Added Flask route detection
-- Created Express route detection patterns
+- Kept Flask and Express route extraction as future extensions
 - Built route information models
 - Added router prefix detection
 
@@ -107,8 +106,7 @@ Bob helped write the code, tests, and documentation that make RepoQuest work.
 
 **Route detection:**
 - FastAPI: `@app.get`, `@router.post`, etc.
-- Flask: `@app.route`, `@blueprint.route`
-- Express: `app.get()`, `router.post()`
+- Future extension: Flask `@app.route`, Express `app.get()` / `router.post()`
 - Method and path extraction
 - Function name detection
 
@@ -118,7 +116,7 @@ Bob helped write the code, tests, and documentation that make RepoQuest work.
 - Designed priority-based reading path generation
 - Created component card generation with test ideas
 - Implemented quiz question generation
-- Built IBM Bob prompt suggestions
+- Built follow-up assistant action suggestions
 - Added role-based file prioritization
 
 **Key files created:**
@@ -131,7 +129,7 @@ Bob helped write the code, tests, and documentation that make RepoQuest work.
 - 30-minute reading path with time estimates
 - Component cards with connections and test ideas
 - Quiz questions based on repository structure
-- IBM Bob prompts for deeper exploration
+- Assistant actions for deeper exploration
 - Role-based prioritization
 
 ### 7. Streamlit UI
@@ -184,7 +182,7 @@ Bob helped write the code, tests, and documentation that make RepoQuest work.
 - Documentation previews
 - Onboarding checklist
 - Quiz questions
-- IBM Bob prompts
+- Follow-up assistant actions
 - Warnings and limitations
 
 ### 9. Tests & Documentation
@@ -287,13 +285,13 @@ These reports document actual development sessions where Bob helped:
 ## Conclusion
 
 IBM Bob was an effective development partner for RepoQuest, helping with:
-- ✅ Fast scaffolding and structure
-- ✅ Implementation of complex features
-- ✅ Comprehensive test generation
-- ✅ Clear documentation
-- ✅ Code review and refinement
+- Fast scaffolding and structure
+- Implementation of complex features
+- Comprehensive test generation
+- Clear documentation
+- Code review and refinement
 
-The result is a deterministic, secure, and useful tool that helps developers onboard to unfamiliar codebases without requiring any runtime AI dependency.
+The result is a deterministic, secure, and useful tool that helps developers onboard to unfamiliar codebases without requiring any runtime AI dependency for the default workflow.
 
 ---
 

@@ -6,19 +6,30 @@ MVP 2 phase: Optional AI Code Assistant.
 
 ## Goal
 
-Create bounded context packs and generated docs pages that can be produced deterministically first, then enhanced by optional AI.
+Extend the bounded context packs introduced in Milestone 15 and add generated docs pages that can be produced deterministically first, then enhanced by optional AI.
+
+## Current Baseline From Milestone 15
+
+Already available:
+
+- Overview, file, component, test, workflow, and documentation context builders.
+- Capped snippets and safe file filtering.
+- Manual AI buttons connected to section-level context.
+- Citation validation and failure handling.
+
+Milestone 16 should focus on richer schema-driven summaries and documentation pages, not on re-creating the provider foundation.
 
 ## Planned Interface
 
 ```python
 @dataclass
 class GeneratedDocPage:
-    title: str
-    category: str
-    source_files: list[str]
-    content: str
-    evidence: list[str]
-    related_components: list[str]
+  title: str
+  category: str
+  source_files: list[str]
+  content: str
+  evidence: list[str]
+  related_components: list[str]
 ```
 
 ## Context Pack Contents

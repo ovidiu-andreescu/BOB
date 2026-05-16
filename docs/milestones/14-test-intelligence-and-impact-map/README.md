@@ -13,13 +13,13 @@ The Tests view should explain what exists, what app files are covered, what rout
 ```python
 @dataclass
 class TestInsight:
-    test_file: str
-    framework: str
-    imports: list[str]
-    likely_targets: list[str]
-    covered_routes: list[str]
-    missing_cases: list[str]
-    suggested_tests: list[str]
+  test_file: str
+  framework: str
+  imports: list[str]
+  likely_targets: list[str]
+  covered_routes: list[str]
+  missing_cases: list[str]
+  suggested_tests: list[str]
 ```
 
 ## Required View Sections
