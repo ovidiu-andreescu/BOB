@@ -176,6 +176,7 @@ def test_build_graph_data_all_debug_mode():
 
   assert len(non_test_nodes) > 0, "all_debug mode should include non-test files"
   # Test files may or may not be present depending on the repo, but mode should allow them
+  assert isinstance(test_nodes, list)
   assert_graph_has_no_orphan_nodes(graph_data)
 
   print(f"Yes all_debug mode includes all files ({len(graph_data.nodes)} total nodes)")

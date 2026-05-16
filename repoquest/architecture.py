@@ -301,9 +301,6 @@ def build_graph_data(
   if max_nodes is None:
     max_nodes = MAX_GRAPH_NODES
 
-  # Build file map
-  file_map = {f.path: f for f in files}
-
   # Filter files based on view mode
   filtered_files = []
   for file in files:

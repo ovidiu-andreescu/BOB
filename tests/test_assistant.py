@@ -1,9 +1,9 @@
 """Tests for AI assistant modules."""
 
+import json
 import ssl
 import urllib.error
 
-import pytest
 from repoquest.assistant_models import (
   AssistantCitation,
   AssistantRequest,
@@ -11,12 +11,14 @@ from repoquest.assistant_models import (
   AssistantRunResult,
 )
 from repoquest.assistant_provider import (
+  AssistantServiceProvider,
   ClaudeAssistantProvider,
   DisabledAssistantProvider,
   MockAssistantProvider,
   get_assistant_config,
   get_assistant_provider,
 )
+from services.assistant_service import build_service_provider
 from repoquest.assistant_validation import (
   validate_assistant_response,
   format_validation_message,
@@ -63,6 +65,10 @@ def test_assistant_request():
   assert "React + FastAPI app" in prompt
   assert "backend/main.py" in prompt
 
+  round_trip = AssistantRequest.from_dict(request.to_dict())
+  assert round_trip.section_id == request.section_id
+  assert round_trip.capped_snippets == request.capped_snippets
+
 
 def test_assistant_response():
   """Test AssistantResponse model."""
@@ -77,6 +83,10 @@ def test_assistant_response():
   assert response.is_valid
   assert response.status == "ok"
   assert len(response.citations) == 1
+
+  round_trip = AssistantResponse.from_dict(response.to_dict())
+  assert round_trip.status == "ok"
+  assert round_trip.citations[0].file_path == "backend/main.py"
 
 
 def test_assistant_run_result():
@@ -165,7 +175,7 @@ def test_assistant_config_loads_local_env(tmp_path, monkeypatch):
     encoding="utf-8",
   )
 
-  enabled, api_key, model = get_assistant_config()
+  enabled, provider, api_key, model, local_base_url, local_model_name = get_assistant_config()
 
   assert enabled is True
   assert api_key == "test-key"
@@ -188,6 +198,92 @@ def test_assistant_provider_uses_local_env(tmp_path, monkeypatch):
   provider = get_assistant_provider()
 
   assert not isinstance(provider, DisabledAssistantProvider)
+
+
+def test_assistant_provider_uses_service_when_configured(tmp_path, monkeypatch):
+  """Test configured service URL uses the async service provider even without app-side key."""
+  monkeypatch.chdir(tmp_path)
+  monkeypatch.delenv("CLAUDE_API_KEY", raising=False)
+  monkeypatch.setenv("REPOQUEST_AI_ENABLED", "true")
+  monkeypatch.setenv("REPOQUEST_ASSISTANT_SERVICE_URL", "http://assistant:8765")
+
+  provider = get_assistant_provider()
+
+  assert isinstance(provider, AssistantServiceProvider)
+
+
+def test_assistant_service_provider_submits_and_polls(monkeypatch):
+  """Test service provider translates async service job status into a response."""
+  responses = [
+    {"job_id": "abc123", "status": "queued"},
+    {"job_id": "abc123", "status": "running"},
+    {
+      "job_id": "abc123",
+      "status": "ok",
+      "response": AssistantResponse(
+        status="ok",
+        response_text="See backend/main.py",
+        citations=[AssistantCitation(file_path="backend/main.py")],
+        provider="mock-service",
+        model="mock",
+      ).to_dict(),
+    },
+  ]
+
+  class FakeHTTPResponse:
+    def __init__(self, payload):
+      self.payload = payload
+
+    def __enter__(self):
+      return self
+
+    def __exit__(self, exc_type, exc, traceback):
+      return False
+
+    def read(self):
+      return json.dumps(self.payload).encode("utf-8")
+
+  def fake_urlopen(req, timeout):
+    return FakeHTTPResponse(responses.pop(0))
+
+  monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
+  monkeypatch.setattr("repoquest.assistant_provider.time.sleep", lambda _seconds: None)
+
+  provider = AssistantServiceProvider("http://assistant:8765", timeout_seconds=3)
+  response = provider.generate(
+    AssistantRequest(
+      section_id="overview",
+      section_title="Overview",
+      user_goal="Summarize",
+      context_summary="Context",
+      evidence_files=["backend/main.py"],
+      capped_snippets={},
+    )
+  )
+
+  assert response.status == "ok"
+  assert response.provider == "mock-service"
+  assert response.citations[0].file_path == "backend/main.py"
+
+
+def test_assistant_service_can_use_mock_provider(monkeypatch):
+  """Test assistant service can run in deterministic mock mode."""
+  monkeypatch.setenv("REPOQUEST_ASSISTANT_SERVICE_PROVIDER", "mock")
+
+  provider = build_service_provider()
+  response = provider.generate(
+    AssistantRequest(
+      section_id="test",
+      section_title="Test",
+      user_goal="Test",
+      context_summary="Test",
+      evidence_files=[],
+      capped_snippets={},
+    )
+  )
+
+  assert response.status == "ok"
+  assert response.provider == "mock"
 
 
 def test_claude_provider_reports_certificate_trust_error(monkeypatch):

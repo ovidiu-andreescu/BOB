@@ -36,12 +36,15 @@ from repoquest.report import (
   extract_code_snippet,
   get_test_files,
   get_doc_files,
-  generate_dependency_summary,
 )
 from repoquest.workflows import generate_work_plan, export_workflows_markdown
 from repoquest.test_intelligence import generate_test_intelligence
-from repoquest.assistant_provider import get_assistant_provider, get_assistant_config
-from repoquest.assistant_validation import validate_assistant_response, format_validation_message
+from repoquest.assistant_provider import get_assistant_provider
+from repoquest.assistant_validation import (
+    validate_assistant_response,
+    format_validation_message,
+    format_recommendation_validation,
+)
 from repoquest.assistant_context import (
   build_overview_context,
   build_file_context,
@@ -51,66 +54,84 @@ from repoquest.assistant_context import (
   build_documentation_context,
 )
 from repoquest.assistant_models import AssistantRunResult
+from repoquest.assistant_state import (
+  get_ai_status,
+  format_ai_status_for_shell,
+  format_ai_status_for_sidebar,
+  format_ai_status_for_tab,
+)
 from repoquest.indicator_rules import split_evidence
+from repoquest.workspace_state import (
+  WorkspaceState,
+  detect_source_change,
+)
+
+
+def get_workspace() -> WorkspaceState:
+  """Get or create workspace state from session."""
+  if "workspace" not in st.session_state:
+    st.session_state["workspace"] = WorkspaceState()
+  return st.session_state["workspace"]
+
+
+def save_workspace(workspace: WorkspaceState) -> None:
+  """Save workspace state to session."""
+  st.session_state["workspace"] = workspace
+  # Also update individual keys for backward compatibility
+  for key, value in workspace.to_dict().items():
+    st.session_state[key] = value
 
 
 def reset_analysis():
   """Reset all analysis state."""
-  keys_to_remove = [
-    "snapshot", "fingerprint", "routes", "import_edges",
-    "arch_map", "dep_graph", "reading_path", "component_cards",
-    "quiz", "source_type", "quiz_answers", "quiz_submitted",
-    "quiz_current_question", "generated_doc", "work_plan", "work_plan_md",
-    "test_intelligence", "assistant_outputs"
-  ]
-  for key in keys_to_remove:
-    if key in st.session_state:
-      del st.session_state[key]
+  workspace = get_workspace()
+  workspace.clear_all()
+  save_workspace(workspace)
 
 
-def get_ai_status_info():
-  """Get AI assistant status information."""
-  ai_enabled, api_key, _model = get_assistant_config()
-  has_key = bool(api_key)
 
-  if not ai_enabled:
-    return "disabled", "AI Assistant is disabled"
-  elif not has_key:
-    return "no_key", "AI Assistant enabled but no API key configured"
-  else:
-    return "ready", "AI Assistant ready"
 
 
 def run_assistant(section_id: str, section_title: str, request_builder, snapshot):
   """Run AI assistant for a section and store result."""
+  workspace = get_workspace()
+  
   if "assistant_outputs" not in st.session_state:
     st.session_state["assistant_outputs"] = {}
 
   provider = get_assistant_provider()
   request = request_builder()
 
-  with st.spinner("AI Assistant thinking..."):
+  with st.spinner("AI Assistant job running..."):
     response = provider.generate(request)
     validated_response = validate_assistant_response(response, snapshot)
+
+  # Get source_id from workspace metadata
+  source_id = workspace.source_metadata.source_id if workspace.source_metadata else ""
 
   result = AssistantRunResult(
     section_id=section_id,
     section_title=section_title,
     request=request,
     response=validated_response,
+    source_id=source_id,
   )
 
   st.session_state["assistant_outputs"][section_id] = result
+  workspace.assistant_outputs[section_id] = result
+  save_workspace(workspace)
   return result
 
 
 def render_assistant_result(result: AssistantRunResult, success_label: str = "AI-assisted response"):
-  """Render an assistant run result with status and citations."""
+  """Render an assistant run result with status, provider info, and citations."""
   if result.response.status == "ok":
-    st.success(f" {success_label}")
+    # Show success with provider/model info
+    provider_info = f" ({result.response.provider}/{result.response.model})" if result.response.provider != "unknown" else ""
+    st.success(f"✨ {success_label}{provider_info}")
     st.markdown(result.response.response_text)
     if result.response.citations:
-      st.caption("Evidence paths")
+      st.caption("📋 Evidence paths")
       citation_data = [
         {
           "File": citation.file_path,
@@ -122,7 +143,13 @@ def render_assistant_result(result: AssistantRunResult, success_label: str = "AI
   else:
     validation_msg = format_validation_message(result.response)
     if validation_msg:
-      st.warning(validation_msg)
+      if result.response.status == "invalid":
+        st.error(validation_msg)
+        st.info("💡 Deterministic analysis is still available in other tabs.")
+      else:
+        st.warning(validation_msg)
+        if result.response.status == "disabled":
+          st.info("💡 Deterministic analysis is available without AI assistance.")
 
 
 ICON_SVG = {
@@ -153,23 +180,38 @@ def render_ui_styles():
       .rq-hero {
         display: flex;
         align-items: center;
+        justify-content: space-between;
         gap: 1rem;
-        padding: 1.15rem 1.25rem;
+        padding: 0.7rem 0.95rem;
         border: 1px solid #d8dee9;
         border-radius: 8px;
-        background: linear-gradient(135deg, #ffffff 0%, #f7f9fc 100%);
-        margin: 0.2rem 0 1rem;
+        background: #ffffff;
+        margin: 0.05rem 0 0.75rem;
       }
       .rq-hero h1 {
         margin: 0;
         color: #1f2937;
-        font-size: 2.1rem;
+        font-size: 1.35rem;
         letter-spacing: 0;
       }
       .rq-hero p {
-        margin: 0.25rem 0 0;
+        margin: 0.1rem 0 0;
         color: #536173;
-        font-size: 1rem;
+        font-size: 0.86rem;
+      }
+      .rq-hero-main,
+      .rq-hero-meta {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        min-width: 0;
+      }
+      .rq-hero-copy {
+        min-width: 0;
+      }
+      .rq-hero-meta {
+        flex-wrap: wrap;
+        justify-content: flex-end;
       }
       .rq-brand-icon,
       .rq-icon {
@@ -180,15 +222,15 @@ def render_ui_styles():
         border-radius: 8px;
       }
       .rq-brand-icon {
-        width: 3rem;
-        height: 3rem;
+        width: 2.45rem;
+        height: 2.45rem;
         color: #1f4f7a;
         background: #e8f1fb;
         border: 1px solid #cfe0f4;
       }
       .rq-brand-icon svg {
-        width: 1.65rem;
-        height: 1.65rem;
+        width: 1.35rem;
+        height: 1.35rem;
         stroke: currentColor;
         fill: none;
         stroke-width: 2;
@@ -266,6 +308,43 @@ def render_ui_styles():
         font-weight: 700;
         line-height: 1.2;
         white-space: nowrap;
+      }
+      .rq-shell-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        min-height: 1.75rem;
+        padding: 0.24rem 0.6rem;
+        border-radius: 999px;
+        border: 1px solid #d7dee9;
+        background: #f8fafc;
+        color: #334155;
+        font-size: 0.78rem;
+        font-weight: 700;
+        white-space: nowrap;
+      }
+      .rq-shell-chip strong {
+        color: #64748b;
+        font-size: 0.68rem;
+        text-transform: uppercase;
+        letter-spacing: 0.02em;
+      }
+      .rq-focus-panel {
+        padding: 0.85rem 0.95rem;
+        border: 1px solid #dbe3ef;
+        border-radius: 8px;
+        background: #fbfdff;
+        margin: 0.25rem 0 0.85rem;
+      }
+      .rq-focus-panel h3 {
+        margin: 0 0 0.35rem;
+        font-size: 1.02rem;
+        color: #1f2937;
+      }
+      .rq-focus-panel p {
+        margin: 0;
+        color: #536173;
+        line-height: 1.4;
       }
       .rq-component-intro {
         padding: 0.75rem 0.85rem;
@@ -404,13 +483,34 @@ def _icon(icon_name: str) -> str:
 
 def render_hero():
   """Render the product header."""
+  workspace = get_workspace()
+  ai_status = get_ai_status()
+  shell_status = format_ai_status_for_shell(ai_status)
+
+  if workspace.source_metadata:
+    source_label = escape(workspace.source_metadata.source_name)
+    files_label = f"{workspace.source_metadata.file_count} scanned"
+  else:
+    source_label = "No source analyzed"
+    files_label = "Ready"
+
+  ai_label = shell_status["label"]
+  ai_title = shell_status.get("title", "")
+
   st.markdown(
     f"""
     <div class="rq-hero">
-      <span class="rq-brand-icon">{_icon("architecture")}</span>
-      <div>
-        <h1>RepoQuest</h1>
-        <p>Turn an unfamiliar repo into a guided onboarding journey.</p>
+      <div class="rq-hero-main">
+        <span class="rq-brand-icon">{_icon("architecture")}</span>
+        <div class="rq-hero-copy">
+          <h1>RepoQuest</h1>
+          <p>Focused repository onboarding workspace.</p>
+        </div>
+      </div>
+      <div class="rq-hero-meta">
+        <span class="rq-shell-chip"><strong>Source</strong>{source_label}</span>
+        <span class="rq-shell-chip"><strong>Scan</strong>{escape(files_label)}</span>
+        <span class="rq-shell-chip" title="{escape(ai_title)}"><strong>Mode</strong>{escape(ai_label)}</span>
       </div>
     </div>
     """,
@@ -487,6 +587,203 @@ def render_metadata_chips(items: list[tuple[str, str | int]]):
     """,
     unsafe_allow_html=True,
   )
+
+
+def render_sidebar_about():
+  """Render product/about content in the persistent sidebar."""
+  with st.expander("About RepoQuest"):
+    st.markdown("**RepoQuest** turns a small repo into an onboarding workspace.")
+    st.caption("Core analysis is deterministic static analysis. AI Review is optional, manual, evidence-cited, and validation-gated.")
+
+  with st.expander("Built with IBM Bob"):
+    st.markdown("IBM Bob helped build the scanner, framework rules, graphing, tests, docs, and UI.")
+    st.caption("IBM Bob is a development partner here, not a runtime dependency.")
+    st.caption("Session reports belong in `bob_sessions/` before final submission.")
+
+
+def build_conceptual_architecture_dot(snapshot, fingerprint, routes) -> str:
+  """Build a high-level architecture graph with generic system names."""
+  roles = {file.role for file in snapshot.files if not file.skipped}
+  has_frontend = bool(roles & {"frontend_page", "frontend_component", "api_client"})
+  has_backend = bool(roles & {"backend_route", "backend_service"})
+  has_models = "model" in roles or "data" in roles
+  has_tests = "test" in roles
+  has_docs = "documentation" in roles
+
+  lines = [
+    "digraph ConceptualArchitecture {",
+    " rankdir=LR;",
+    ' graph [pad="0.25", nodesep="0.45", ranksep="0.55"];',
+    ' node [shape=box, style="rounded,filled", fontcolor="#111827", color="#334155", fillcolor="#F8FAFC"];',
+    ' edge [color="#64748B", fontcolor="#475569"];',
+    "",
+  ]
+
+  lines.append(' "Contributor" [fillcolor="#EFF6FF"];')
+  if has_docs:
+    lines.append(' "Docs / README" [fillcolor="#F8FAFC"];')
+    lines.append(' "Contributor" -> "Docs / README" [label="starts with"];')
+
+  if has_frontend:
+    lines.append(' "Browser / User" [fillcolor="#ECFEFF"];')
+    lines.append(' "Frontend App" [fillcolor="#DCFCE7"];')
+    lines.append(' "Pages" [fillcolor="#DCFCE7"];')
+    lines.append(' "UI Components" [fillcolor="#DCFCE7"];')
+    lines.append(' "API Client" [fillcolor="#FEF9C3"];')
+    lines.append(' "Browser / User" -> "Frontend App";')
+    lines.append(' "Frontend App" -> "Pages";')
+    lines.append(' "Pages" -> "UI Components";')
+    lines.append(' "Pages" -> "API Client";')
+    if has_docs:
+      lines.append(' "Docs / README" -> "Frontend App" [style=dashed];')
+
+  if has_backend or routes:
+    gateway_label = f"API Routes / Gateway\\n{len(routes)} detected route(s)" if routes else "API Routes / Gateway"
+    lines.append(f' "API Routes / Gateway" [label="{gateway_label}", fillcolor="#FFEDD5"];')
+    if has_frontend:
+      lines.append(' "API Client" -> "API Routes / Gateway" [label="HTTP/API", color="#2563EB"];')
+    else:
+      lines.append(' "Contributor" -> "API Routes / Gateway";')
+    if has_docs:
+      lines.append(' "Docs / README" -> "API Routes / Gateway" [style=dashed];')
+
+  if "backend_service" in roles:
+    lines.append(' "Services / Business Logic" [fillcolor="#FFEDD5"];')
+    lines.append(' "API Routes / Gateway" -> "Services / Business Logic";')
+
+  if has_models:
+    storage_label = "Models / Storage Boundary"
+    lines.append(f' "{storage_label}" [fillcolor="#E0F2FE"];')
+    if "backend_service" in roles:
+      lines.append(f' "Services / Business Logic" -> "{storage_label}";')
+    elif has_backend or routes:
+      lines.append(f' "API Routes / Gateway" -> "{storage_label}";')
+
+  if has_tests:
+    lines.append(' "Test Suite" [fillcolor="#F3E8FF"];')
+    if has_backend or routes:
+      lines.append(' "Test Suite" -> "API Routes / Gateway" [style=dashed, label="validates"];')
+    elif has_frontend:
+      lines.append(' "Test Suite" -> "Frontend App" [style=dashed, label="validates"];')
+
+  framework_label = "\\n".join(f.name for f in fingerprint.frameworks[:4]) if fingerprint else ""
+  if framework_label:
+    lines.append(f' "Detected Frameworks" [label="Detected Frameworks\\n{framework_label}", fillcolor="#F1F5F9"];')
+    lines.append(' "Contributor" -> "Detected Frameworks" [style=dashed];')
+
+  lines.append("}")
+  return "\n".join(lines)
+
+
+def build_file_tree_text(files) -> str:
+  """Build a compact ASCII tree from scanned file paths."""
+  root: dict[str, dict] = {}
+  for file in sorted(files, key=lambda item: item.path):
+    parts = file.path.split("/")
+    cursor = root
+    for part in parts:
+      cursor = cursor.setdefault(part, {})
+
+  lines: list[str] = []
+
+  def walk(node: dict[str, dict], prefix: str = "") -> None:
+    entries = sorted(node.items(), key=lambda item: (bool(item[1]), item[0].lower()))
+    for index, (name, child) in enumerate(entries):
+      connector = "`-- " if index == len(entries) - 1 else "|-- "
+      lines.append(f"{prefix}{connector}{name}")
+      extension = "    " if index == len(entries) - 1 else "|   "
+      if child:
+        walk(child, prefix + extension)
+
+  walk(root)
+  return "\n".join(lines[:450])
+
+
+def render_file_analysis_panel(file_info, snapshot, edges, routes, key_prefix: str):
+  """Render a focused file analysis surface."""
+  render_metadata_chips([
+    ("Role", file_info.role.replace("_", " ").title()),
+    ("Language", file_info.language),
+    ("Lines", file_info.line_count),
+    ("Size", format_file_size(file_info.size_bytes)),
+  ])
+
+  render_mini_label("Deterministic Analysis", "overview", tone_for_role(file_info.role))
+  st.markdown(f"**Path:** `{file_info.path}`")
+  if file_info.skipped:
+    st.warning(file_info.skip_reason or "This file was skipped.")
+  elif file_info.role == "entrypoint":
+    st.markdown("Likely application startup or app shell.")
+  elif file_info.role == "backend_route":
+    st.markdown("Likely API route/controller layer where requests enter the backend.")
+  elif file_info.role == "api_client":
+    st.markdown("Likely frontend-to-backend API client boundary.")
+  elif file_info.role == "backend_service":
+    st.markdown("Likely business logic or orchestration layer.")
+  elif file_info.role in {"frontend_page", "frontend_component"}:
+    st.markdown("Likely frontend UI surface.")
+  elif file_info.role == "test":
+    st.markdown("Likely test coverage for app behavior.")
+  else:
+    st.markdown("RepoQuest classified this file from its path, extension, and content hints.")
+
+  incoming = sorted({edge.source for edge in edges if edge.target == file_info.path})
+  outgoing = sorted({edge.target for edge in edges if edge.source == file_info.path})
+  related_routes = [route for route in routes if route.file_path == file_info.path]
+
+  dep_col, route_col = st.columns(2)
+  with dep_col:
+    render_mini_label("Dependencies", "architecture", "blue")
+    dep_rows = [{"Direction": "Imported by", "File": path} for path in incoming[:8]]
+    dep_rows += [{"Direction": "Imports", "File": path} for path in outgoing[:8]]
+    if dep_rows:
+      st.dataframe(pd.DataFrame(dep_rows), use_container_width=True, hide_index=True)
+    else:
+      st.caption("No local dependency edges detected.")
+
+  with route_col:
+    render_mini_label("Routes", "route", "orange")
+    if related_routes:
+      st.dataframe(
+        pd.DataFrame([
+          {"Method": route.method, "Path": route.path, "Function": route.function_name or "N/A"}
+          for route in related_routes
+        ]),
+        use_container_width=True,
+        hide_index=True,
+      )
+    else:
+      st.caption("No API routes detected in this file.")
+
+  if file_info.text_preview and not file_info.skipped:
+    render_mini_label("Code View", "file", tone_for_role(file_info.role))
+    render_code_viewer(
+      file_info.text_preview,
+      get_language_for_st_code(file_info),
+      key=f"{key_prefix}_{file_info.path}",
+      title=file_info.path,
+      compact_chars=8_000,
+      expanded_chars=MAX_TEXT_PREVIEW_CHARS,
+      compact_height=430,
+      expanded_height=720,
+    )
+
+  render_mini_label("AI Review", "assistant", "purple")
+  ai_status = get_ai_status()
+  if ai_status.is_ready:
+    section_key = f"{key_prefix}_ai_{file_info.path}"
+    if st.button(f"Review {file_info.name}", key=section_key):
+      def build_request():
+        return build_file_context(file_info, snapshot, routes) # type: ignore
+      result = run_assistant(section_key, f"File: {file_info.name}", build_request, snapshot)
+
+    if "assistant_outputs" in st.session_state and section_key in st.session_state["assistant_outputs"]:
+      result = st.session_state["assistant_outputs"][section_key]
+      render_assistant_result(result, "AI-assisted file review")
+  else:
+    tab_caption = format_ai_status_for_tab(ai_status)
+    if tab_caption:
+      st.caption(tab_caption)
 
 
 def format_file_size(size_bytes: int) -> str:
@@ -919,27 +1216,42 @@ def main():
     layout="wide",
   )
   render_ui_styles()
-  analysis_ready = "snapshot" in st.session_state
-  if analysis_ready:
-    st.markdown(
-      """
-      <style>
-        [data-testid="stSidebar"],
-        [data-testid="collapsedControl"] {
-          display: none !important;
-        }
-      </style>
-      """,
-      unsafe_allow_html=True,
-    )
 
   # Header
   render_hero()
-  st.caption("Detects project type, maps architecture, finds key files, and creates a 30-minute contributor path.")
 
   # Sidebar
   with st.sidebar:
+    workspace = get_workspace()
+    
+    render_mini_label("Workspace", "overview", "slate")
+    if workspace.source_metadata:
+      st.success(f"Analyzing: {workspace.source_metadata.source_name}")
+      st.caption(f"{workspace.source_metadata.file_count} files scanned")
+      
+      # Show source type and timestamp
+      source_type_label = "Bundled demo" if workspace.source_metadata.source_type == "demo" else "Uploaded ZIP"
+      st.caption(f"Source: {source_type_label}")
+      
+      # Show analysis timestamp
+      from datetime import datetime
+      try:
+        ts = workspace.source_metadata.timestamp
+        if isinstance(ts, str):
+          ts = datetime.fromisoformat(ts.replace('Z', '+00:00'))
+        st.caption(f"Analyzed: {ts.strftime('%Y-%m-%d %H:%M UTC')}")
+      except (ValueError, AttributeError):
+        pass
+      
+      # Show AI outputs count if any
+      if workspace.assistant_outputs:
+        st.caption(f"AI outputs: {len(workspace.assistant_outputs)}")
+    else:
+      st.info("No repository analyzed yet.")
+
+    st.markdown("---")
     render_mini_label("Input Source", "folder", "blue")
+    st.caption("Source controls remain available after analysis. Switch sources or re-analyze anytime.")
 
     input_mode = st.radio(
       "Choose input:",
@@ -956,20 +1268,47 @@ def main():
         help=f"Upload a repository ZIP file (max {MAX_ZIP_SIZE_MB} MB)"
       )
 
-    st.markdown("---")
+    generate_disabled = input_mode == "Upload ZIP" and uploaded_file is None
 
+    st.markdown("---")
+    
     # AI Assistant status
-    ai_status, ai_message = get_ai_status_info()
-    with st.expander("AI Assistant"):
-      if ai_status == "ready":
-        st.success(ai_message)
-        st.caption("AI features available in tabs after generating quest")
-      elif ai_status == "no_key":
-        st.warning(f"Warning: {ai_message}")
-        st.caption("Set CLAUDE_API_KEY to enable AI features")
-      else:
-        st.info(f"Info: {ai_message}")
-        st.caption("Set REPOQUEST_AI_ENABLED=true to enable")
+    ai_status = get_ai_status()
+    sidebar_status = format_ai_status_for_sidebar(ai_status)
+    render_mini_label("AI Review", "assistant", "purple")
+    
+    if sidebar_status["type"] == "success":
+      st.success(sidebar_status["message"])
+    elif sidebar_status["type"] == "warning":
+      st.warning(sidebar_status["message"])
+    else:
+      st.info(sidebar_status["message"])
+    
+    if sidebar_status.get("caption"):
+      st.caption(sidebar_status["caption"])
+    
+    if ai_status.is_ready:
+      st.caption("AI reviews are manual, evidence-cited, and validation-gated.")
+    
+    # Deployment profile info
+    from repoquest.config import get_deployment_profile, get_profile_description
+    profile = get_deployment_profile()
+    profile_desc = get_profile_description(profile)
+    
+    with st.expander("Deployment Profile", expanded=False):
+      st.caption(f"**{profile}**")
+      st.caption(profile_desc)
+      
+      if profile == "deterministic":
+        st.info("✓ No secrets required\n✓ No external calls\n✓ Fully offline")
+      elif profile == "mock_assistant":
+        st.info("✓ Testing mode\n✓ No network calls\n✓ No API costs")
+      elif profile == "cloud_assistant":
+        st.warning("⚠ Sends code snippets to Claude API\n⚠ API costs apply")
+      elif profile == "local_model":
+        st.info("✓ Private/offline AI\n✓ No cloud calls\n⚠ Requires local model server")
+      elif profile == "service_assistant":
+        st.info("✓ Async processing\n⚠ Requires assistant service")
 
     # App limits info
     with st.expander("App Limits"):
@@ -984,190 +1323,244 @@ def main():
       ])
       st.dataframe(limits_df, use_container_width=True, hide_index=True)
 
-    generate_disabled = input_mode == "Upload ZIP" and uploaded_file is None
+    render_sidebar_about()
 
-    col1, col2 = st.columns(2)
+  # Main content area - Generate/Reset buttons
+  workspace = get_workspace()
+  
+  # Show generate/reset controls prominently
+  col1, col2 = st.columns(2)
 
-    with col1:
-      if st.button(
-        "Generate Quest",
-        type="primary",
-        use_container_width=True,
-        disabled=generate_disabled,
-        help="Analyze the repository and generate onboarding quest"
-      ):
-        # Reset previous state
-        reset_analysis()
+  with col1:
+    if st.button(
+      "Generate Quest",
+      type="primary",
+      use_container_width=True,
+      disabled=generate_disabled,
+      help="Analyze the repository and generate onboarding quest"
+    ):
+      workspace = get_workspace()
+      snapshot = None
+      new_source_type = "demo" if input_mode == "Use demo repo" else "upload"
 
-        snapshot = None
-
-        if input_mode == "Use demo repo":
-          with st.spinner("Scanning demo repository..."):
-            try:
-              snapshot = load_demo_repo()
-              st.session_state["snapshot"] = snapshot
-              st.session_state["source_type"] = "demo"
-            except Exception as e:
-              st.error(f"Error loading demo repository: {e}")
-              return
-
-        elif input_mode == "Upload ZIP" and uploaded_file:
-          with st.spinner("Validating and scanning ZIP file..."):
-            try:
-              # Save uploaded file to temporary location
-              with tempfile.NamedTemporaryFile(delete=False, suffix=".zip") as tmp_file:
-                tmp_file.write(uploaded_file.getvalue())
-                tmp_path = Path(tmp_file.name)
-
-              try:
-                # Scan the ZIP file
-                snapshot = scan_zip(tmp_path)
-                st.session_state["snapshot"] = snapshot
-                st.session_state["source_type"] = "upload"
-              finally:
-                # Clean up temp file
-                tmp_path.unlink(missing_ok=True)
-
-            except ZIPSafetyError as e:
-              st.error(f"ZIP Safety Error: {e}")
-              st.warning("The uploaded ZIP file failed security validation. Please ensure it contains only safe paths and is under the size limit.")
-              return
-            except Exception as e:
-              st.error(f"Error processing ZIP file: {e}")
-              import traceback
-              with st.expander("Show error details"):
-                render_code_viewer(
-                  traceback.format_exc(),
-                  "python",
-                  key="zip_error_traceback",
-                  title="Error details",
-                  compact_chars=4_000,
-                  expanded_chars=MAX_TEXT_PREVIEW_CHARS,
-                  compact_height=260,
-                  expanded_height=680,
-                )
-              return
-
-        # Continue with analysis if we have a snapshot
-        if snapshot:
+      if input_mode == "Use demo repo":
+        with st.spinner("Scanning demo repository..."):
           try:
-            # Generate fingerprint
-            with st.spinner("Detecting frameworks and project type..."):
-              fingerprint = generate_fingerprint(snapshot)
-              st.session_state["fingerprint"] = fingerprint
-
-            # Extract routes
-            with st.spinner("Extracting API routes..."):
-              routes = extract_all_routes(snapshot.files)
-              st.session_state["routes"] = routes
-
-            # Build import graph
-            with st.spinner("Building dependency graph..."):
-              edges = build_import_graph(snapshot.files, "")
-              st.session_state["import_edges"] = edges
-
-            # Generate graphs
-            with st.spinner("Generating architecture maps..."):
-              arch_map = generate_architecture_map(snapshot.files, routes)
-              st.session_state["arch_map"] = arch_map
-
-              # Filter out test files from dependency graph
-              test_files = get_test_files(snapshot)
-              test_paths = {f.path for f in test_files}
-              non_test_edges = [e for e in edges if e.source not in test_paths and e.target not in test_paths]
-              non_test_files = [f for f in snapshot.files if f.path not in test_paths]
-
-              if non_test_edges:
-                dep_graph = generate_dependency_graph(non_test_files, non_test_edges)
-              else:
-                dep_graph = generate_simple_graph(non_test_files)
-              st.session_state["dep_graph"] = dep_graph
-
-            # Generate reading path
-            with st.spinner("Creating reading path..."):
-              reading_path = generate_reading_path(snapshot, fingerprint)
-              st.session_state["reading_path"] = reading_path
-
-            # Generate component cards
-            with st.spinner("Generating component cards..."):
-              component_cards = generate_component_cards(snapshot, fingerprint, routes)
-              st.session_state["component_cards"] = component_cards
-
-            # Generate quiz
-            with st.spinner("Creating quiz questions..."):
-              quiz = generate_quiz(snapshot, fingerprint, routes)
-              st.session_state["quiz"] = quiz
-
-            # Generate work plan
-            with st.spinner("Generating work plan and workflows..."):
-              work_plan = generate_work_plan(
-                snapshot, fingerprint, routes, edges, reading_path, component_cards
-              )
-              st.session_state["work_plan"] = work_plan
-
-            # Generate test intelligence
-            with st.spinner("Analyzing test coverage..."):
-              test_intelligence = generate_test_intelligence(
-                snapshot, routes, edges, component_cards
-              )
-              st.session_state["test_intelligence"] = test_intelligence
-
-            st.success("Onboarding Quest generated successfully!")
-            st.rerun()
+            snapshot = load_demo_repo()
           except Exception as e:
-            st.error(f"Error analyzing repository: {e}")
+            st.error(f"Error loading demo repository: {e}")
+            return
+
+      elif input_mode == "Upload ZIP" and uploaded_file:
+        with st.spinner("Validating and scanning ZIP file..."):
+          try:
+            # Save uploaded file to temporary location
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".zip") as tmp_file:
+              tmp_file.write(uploaded_file.getvalue())
+              tmp_path = Path(tmp_file.name)
+
+            try:
+              # Scan the ZIP file
+              snapshot = scan_zip(tmp_path)
+            finally:
+              # Clean up temp file
+              tmp_path.unlink(missing_ok=True)
+
+          except ZIPSafetyError as e:
+            st.error(f"ZIP Safety Error: {e}")
+            st.warning("The uploaded ZIP file failed security validation. Please ensure it contains only safe paths and is under the size limit.")
+            return
+          except Exception as e:
+            st.error(f"Error processing ZIP file: {e}")
             import traceback
             with st.expander("Show error details"):
               render_code_viewer(
                 traceback.format_exc(),
                 "python",
-                key="analysis_error_traceback",
+                key="zip_error_traceback",
                 title="Error details",
                 compact_chars=4_000,
                 expanded_chars=MAX_TEXT_PREVIEW_CHARS,
                 compact_height=260,
                 expanded_height=680,
               )
+            return
 
-    with col2:
-      if st.button(
-        "Reset",
-        use_container_width=True,
-        help="Clear current analysis and start fresh"
-      ):
-        reset_analysis()
-        st.rerun()
+      # Continue with analysis if we have a snapshot
+      if snapshot:
+        # Detect source change and handle stale state
+        source_changed, new_metadata = detect_source_change(
+          workspace.source_metadata,
+          snapshot,
+          new_source_type,
+        )
+
+        if source_changed:
+          st.info(f"Source changed. Clearing previous analysis for: {workspace.source_metadata.source_name if workspace.source_metadata else 'unknown'}")
+          workspace.clear_analysis()
+
+        # Update workspace with new source
+        workspace.source_metadata = new_metadata
+        workspace.snapshot = snapshot
+
+        # Save to session state for backward compatibility
+        st.session_state["snapshot"] = snapshot
+        st.session_state["source_type"] = new_source_type
+        st.session_state["source_metadata"] = new_metadata
+        try:
+          # Generate fingerprint
+          with st.spinner("Detecting frameworks and project type..."):
+            fingerprint = generate_fingerprint(snapshot)
+            workspace.fingerprint = fingerprint
+            st.session_state["fingerprint"] = fingerprint
+
+          # Extract routes
+          with st.spinner("Extracting API routes..."):
+            routes = extract_all_routes(snapshot.files)
+            workspace.routes = routes
+            st.session_state["routes"] = routes
+
+          # Build import graph
+          with st.spinner("Building dependency graph..."):
+            edges = build_import_graph(snapshot.files, "")
+            workspace.import_edges = edges
+            st.session_state["import_edges"] = edges
+
+          # Generate graphs
+          with st.spinner("Generating architecture maps..."):
+            arch_map = generate_architecture_map(snapshot.files, routes)
+            workspace.arch_map = arch_map
+            st.session_state["arch_map"] = arch_map
+
+            # Filter out test files from dependency graph
+            test_files = get_test_files(snapshot)
+            test_paths = {f.path for f in test_files}
+            non_test_edges = [e for e in edges if e.source not in test_paths and e.target not in test_paths]
+            non_test_files = [f for f in snapshot.files if f.path not in test_paths]
+
+            if non_test_edges:
+              dep_graph = generate_dependency_graph(non_test_files, non_test_edges)
+            else:
+              dep_graph = generate_simple_graph(non_test_files)
+            workspace.dep_graph = dep_graph
+            st.session_state["dep_graph"] = dep_graph
+
+          # Generate reading path
+          with st.spinner("Creating reading path..."):
+            reading_path = generate_reading_path(snapshot, fingerprint)
+            workspace.reading_path = reading_path
+            st.session_state["reading_path"] = reading_path
+
+          # Generate component cards
+          with st.spinner("Generating component cards..."):
+            component_cards = generate_component_cards(snapshot, fingerprint, routes)
+            workspace.component_cards = component_cards
+            st.session_state["component_cards"] = component_cards
+
+          # Generate quiz
+          with st.spinner("Creating quiz questions..."):
+            quiz = generate_quiz(snapshot, fingerprint, routes)
+            workspace.quiz = quiz
+            st.session_state["quiz"] = quiz
+
+          # Generate work plan
+          with st.spinner("Generating work plan and workflows..."):
+            work_plan = generate_work_plan(
+              snapshot, fingerprint, routes, edges, reading_path, component_cards
+            )
+            workspace.work_plan = work_plan
+            st.session_state["work_plan"] = work_plan
+
+          # Generate test intelligence
+          with st.spinner("Analyzing test coverage..."):
+            test_intelligence = generate_test_intelligence(
+              snapshot, routes, edges, component_cards
+            )
+            workspace.test_intelligence = test_intelligence
+            st.session_state["test_intelligence"] = test_intelligence
+
+          # Save workspace
+          save_workspace(workspace)
+
+          st.success("Onboarding Quest generated successfully!")
+          st.rerun()
+        except Exception as e:
+          st.error(f"Error analyzing repository: {e}")
+          import traceback
+          with st.expander("Show error details"):
+            render_code_viewer(
+              traceback.format_exc(),
+              "python",
+              key="analysis_error_traceback",
+              title="Error details",
+              compact_chars=4_000,
+              expanded_chars=MAX_TEXT_PREVIEW_CHARS,
+              compact_height=260,
+              expanded_height=680,
+            )
+
+  with col2:
+    if st.button(
+      "Reset",
+      use_container_width=True,
+      help="Clear current analysis and start fresh"
+    ):
+      reset_analysis()
+      st.rerun()
+
+  st.markdown("---")
 
   # Main content
-  if "snapshot" in st.session_state:
-    snapshot = st.session_state["snapshot"]
-    fingerprint = st.session_state.get("fingerprint")
-    source_type = st.session_state.get("source_type", "unknown")
+  if workspace.has_analysis():
+    snapshot = workspace.snapshot
+    fingerprint = workspace.fingerprint
+    source_type = workspace.source_metadata.source_type if workspace.source_metadata else "unknown"
 
-    # Source info
-    source_col, refresh_col = st.columns([5, 1])
-    with source_col:
-      if source_type == "demo":
-        st.info(f"Analyzing bundled demo: **{snapshot.source_name}**")
-      elif source_type == "upload":
-        st.info(f"Analyzing uploaded ZIP: **{snapshot.source_name}**")
-    with refresh_col:
-      if st.button("Refresh", use_container_width=True):
+    # Source info with refresh capability
+    st.info(f"📊 **Current Analysis:** {workspace.source_metadata.source_name if workspace.source_metadata else 'Unknown'} ({source_type})")
+    
+    col1, col2, col3 = st.columns([1, 1, 4])
+    with col1:
+      if st.button("🔄 Refresh Analysis", use_container_width=True, help="Re-run analysis on the same source"):
+        # Keep source, clear derived analysis
+        workspace.clear_analysis()
+        workspace.snapshot = snapshot
+        save_workspace(workspace)
         st.rerun()
+    with col2:
+      if st.button("📥 Switch Source", use_container_width=True, help="Go back to source selection"):
+        st.info("Use the sidebar to select a new source and click 'Generate Quest'")
 
-    # Create tabs
-    tabs = st.tabs([
+    # Create grouped workspace tabs. The legacy sections below are intentionally
+    # mapped into fewer top-level groups so the app feels like a focused workbench.
+    workspace_tabs = st.tabs([
       "Overview",
-      "Architecture Map",
-      "Reading Path",
+      "Architecture",
+      "Files",
+      "API Routes",
+      "Read",
       "Components",
-      "Tests",
       "Work Plans",
-      "Quest & Quiz",
-      "Documentation",
+      "Agent Workflows",
+      "AI Recommendations",
+      "Improve",
       "Export",
-      "Built with IBM Bob"
     ])
+    tabs = [
+      workspace_tabs[0], # Overview
+      workspace_tabs[1], # Architecture
+      workspace_tabs[4], # Reading Path
+      workspace_tabs[5], # Components
+      workspace_tabs[9], # Tests
+      workspace_tabs[6], # Work Plans
+      workspace_tabs[9], # Quest & Quiz
+      workspace_tabs[10], # Documentation
+      workspace_tabs[10], # Export
+    ]
+    files_tab = workspace_tabs[2]
+    routes_tab = workspace_tabs[3]
+    workflows_tab = workspace_tabs[7]
+    recommendations_tab = workspace_tabs[8]
 
     # Tab 1: Overview
     with tabs[0]:
@@ -1179,6 +1572,42 @@ def main():
       )
 
       if fingerprint:
+        reading_path = st.session_state.get("reading_path", [])
+        next_read = reading_path[0].path if reading_path else "No reading path generated"
+        framework_names = ", ".join(f.name for f in fingerprint.frameworks[:3]) or "No confident framework"
+        entry_preview = fingerprint.entry_points[0] if fingerprint.entry_points else "No entry point detected"
+
+        render_mini_label("Focus Board", "overview", "blue")
+        focus_col1, focus_col2, focus_col3, focus_col4 = st.columns(4)
+        with focus_col1:
+          st.metric("Project", fingerprint.project_type)
+        with focus_col2:
+          st.metric("Confidence", f"{fingerprint.confidence * 100:.0f}%")
+        with focus_col3:
+          st.metric("Frameworks", len(fingerprint.frameworks))
+          st.caption(framework_names)
+        with focus_col4:
+          st.metric("Next Read", "Start here")
+          st.caption(next_read)
+
+        with st.container():
+          st.markdown(
+            f"""
+            <div class="rq-focus-panel">
+              <h3>Entry point in focus</h3>
+              <p>{escape(entry_preview)}</p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+          )
+
+        if "arch_map" in st.session_state:
+          with st.expander("Architecture preview", expanded=True):
+            try:
+              st.graphviz_chart(st.session_state["arch_map"], use_container_width=False)
+            except Exception:
+              st.caption("Architecture preview is available in the Map workspace.")
+
         # Project type and confidence
         col1, col2 = st.columns([2, 1])
         with col1:
@@ -1308,13 +1737,14 @@ def main():
         scanned_files = [f for f in snapshot.files if not f.skipped]
         st.metric("Analyzed Files", len(scanned_files))
 
-      # AI Assistant section
+      # AI Review section
       st.markdown("---")
-      render_mini_label("AI Assistant", "assistant", "purple")
+      render_mini_label("AI Review", "assistant", "purple")
 
-      ai_status, _ = get_ai_status_info()
+      ai_status = get_ai_status()
       if ai_status == "ready" and fingerprint:
-        if st.button("Get AI Insights on Overview", key="ai_overview"):
+        st.caption("Adds an evidence-cited review on top of the deterministic overview.")
+        if st.button("Generate Overview Review", key="ai_overview"):
           def build_request():
             return build_overview_context(snapshot, fingerprint) # type: ignore
           result = run_assistant("overview", "Repository Overview", build_request, snapshot)
@@ -1323,17 +1753,36 @@ def main():
         if "assistant_outputs" in st.session_state and "overview" in st.session_state["assistant_outputs"]:
           result = st.session_state["assistant_outputs"]["overview"]
           render_assistant_result(result, "AI-assisted overview")
-      elif ai_status != "ready":
-        st.info("AI Assistant is not enabled. See sidebar for configuration.")
+      else:
+        st.caption("AI review is disabled for this workspace. Deterministic findings are complete and usable.")
 
     # Tab 2: Architecture Map
     with tabs[1]:
       render_section_header(
         "Architecture Map",
-        "Interactive graph views for application structure, dependencies, routes, and file inspection.",
+        "Conceptual system overview plus interactive application dependency graph.",
         "architecture",
         "purple",
       )
+
+      render_mini_label("System Overview", "architecture", "purple")
+      conceptual_dot = build_conceptual_architecture_dot(
+        snapshot,
+        st.session_state.get("fingerprint"),
+        st.session_state.get("routes", []),
+      )
+      st.graphviz_chart(conceptual_dot, use_container_width=False)
+
+      layer_rows = [
+        {"Layer": "Docs / README", "Meaning": "Contributor-facing starting context"},
+        {"Layer": "Frontend App", "Meaning": "Browser UI, pages, components, and API client when detected"},
+        {"Layer": "API Routes / Gateway", "Meaning": "Detected HTTP route boundary"},
+        {"Layer": "Services / Business Logic", "Meaning": "Backend service modules and orchestration"},
+        {"Layer": "Models / Storage Boundary", "Meaning": "Schemas, models, data files, or storage-facing code when detected"},
+        {"Layer": "Test Suite", "Meaning": "Validation surface shown separately from production graph"},
+      ]
+      with st.expander("Layer definitions", expanded=False):
+        st.dataframe(pd.DataFrame(layer_rows), use_container_width=True, hide_index=True)
 
       if "import_edges" in st.session_state and "snapshot" in st.session_state:
         edges = st.session_state["import_edges"]
@@ -1365,8 +1814,6 @@ def main():
               help="Maximum number of nodes to display"
             )
 
-        # Build filtered graph data
-        from repoquest.models import GraphViewMode
         graph_data = build_graph_data(
           files=snapshot.files,
           edges=edges,
@@ -1527,13 +1974,13 @@ def main():
                   tests_df = pd.DataFrame(tests_data)
                   st.dataframe(tests_df, use_container_width=True, hide_index=True)
 
-              # AI Assistant Action
+              # AI Review
               st.markdown("---")
-              render_mini_label("AI Assistant Action", "assistant", "purple")
+              render_mini_label("AI Review", "assistant", "purple")
 
-              ai_status, _ = get_ai_status_info()
-              if ai_status == "ready":
-                if st.button(f"Ask AI about {file_info.name}", key=f"ai_file_{selected_node_path}"):
+              ai_status = get_ai_status()
+              if ai_status.is_ready:
+                if st.button(f"Review {file_info.name}", key=f"ai_file_{selected_node_path}"):
                   routes = st.session_state.get("routes", [])
                   def build_request():
                     return build_file_context(file_info, snapshot, routes) # type: ignore
@@ -1543,9 +1990,11 @@ def main():
                 section_key = f"file_{selected_node_path}"
                 if "assistant_outputs" in st.session_state and section_key in st.session_state["assistant_outputs"]:
                   result = st.session_state["assistant_outputs"][section_key]
-                  render_assistant_result(result, "AI-assisted file analysis")
+                  render_assistant_result(result, "AI-assisted file review")
               else:
-                st.caption("AI Assistant not enabled")
+                tab_caption = format_ai_status_for_tab(ai_status)
+                if tab_caption:
+                  st.caption(tab_caption)
 
         else:
           st.info("Select a file from the graph above to see detailed information.")
@@ -1554,7 +2003,7 @@ def main():
         st.info("Architecture map will appear here after generating the quest.")
 
       # Detected Routes
-      if "routes" in st.session_state:
+      if False and "routes" in st.session_state:
         routes = st.session_state["routes"]
 
         if routes:
@@ -1592,11 +2041,118 @@ def main():
             height=min(400, len(routes) * 35 + 38)
           )
 
+    # File explorer workspace
+    with files_tab:
+      render_section_header(
+        "File Explorer",
+        "Browse the scanned repo structure and inspect one file at a time.",
+        "folder",
+        "blue",
+      )
+
+      active_files = [file for file in snapshot.files if not file.skipped]
+      col_tree, col_file = st.columns([1, 2])
+
+      with col_tree:
+        render_mini_label("Repository Tree", "folder", "blue")
+        tree_text = build_file_tree_text(snapshot.files)
+        render_code_viewer(
+          tree_text or "No files scanned.",
+          "text",
+          key="repository_tree",
+          title="Repository tree",
+          compact_chars=12_000,
+          expanded_chars=20_000,
+          compact_height=520,
+          expanded_height=760,
+        )
+
+      with col_file:
+        render_mini_label("Open File", "file", "orange")
+        role_filter_options = ["All"] + sorted({file.role for file in active_files})
+        selected_file_role = st.selectbox("Role filter:", role_filter_options, key="file_explorer_role")
+        filtered_files = active_files
+        if selected_file_role != "All":
+          filtered_files = [file for file in active_files if file.role == selected_file_role]
+
+        if filtered_files:
+          selected_file_path = st.selectbox(
+            "File:",
+            [file.path for file in filtered_files],
+            key="file_explorer_selected_path",
+          )
+          selected_file = next(file for file in filtered_files if file.path == selected_file_path)
+          render_file_analysis_panel(
+            selected_file,
+            snapshot,
+            st.session_state.get("import_edges", []),
+            st.session_state.get("routes", []),
+            "file_explorer",
+          )
+        else:
+          st.warning("No files match that role filter.")
+
+    # API route workspace
+    with routes_tab:
+      render_section_header(
+        "API Routes",
+        "Detected HTTP endpoints with linked files and focused route analysis.",
+        "route",
+        "orange",
+      )
+
+      routes = st.session_state.get("routes", [])
+      if routes:
+        route_options = {
+          idx: f"{route.method} {route.path} - {route.file_path}"
+          for idx, route in enumerate(routes)
+        }
+        selected_route_idx = st.selectbox(
+          "Choose one route:",
+          list(route_options.keys()),
+          format_func=lambda idx: route_options[idx],
+          key="selected_api_route",
+        )
+        route = routes[selected_route_idx]
+
+        render_metadata_chips([
+          ("Method", route.method),
+          ("Path", route.path),
+          ("Framework", route.framework.upper()),
+          ("Function", route.function_name or "N/A"),
+        ])
+        st.markdown(f"**Route file:** `{route.file_path}`")
+
+        route_file = next((file for file in snapshot.files if file.path == route.file_path), None)
+        if route_file:
+          render_file_analysis_panel(
+            route_file,
+            snapshot,
+            st.session_state.get("import_edges", []),
+            routes,
+            "api_route_file",
+          )
+
+        with st.expander("All detected routes", expanded=False):
+          routes_df = pd.DataFrame([
+            {
+              "Method": item.method,
+              "Path": item.path,
+              "File": item.file_path,
+              "Function": item.function_name or "N/A",
+              "Framework": item.framework.upper(),
+            }
+            for item in routes
+          ])
+          st.dataframe(routes_df, use_container_width=True, hide_index=True)
+      else:
+        st.info("No API routes were detected in this repository.")
+
     # Tab 3: Reading Path
     with tabs[2]:
       render_section_header(
         "Reading & Evidence Workbench",
-        "A guided file sequence with previews, role context, improvement ideas, and assistant actions.",
+        "A guided file sequence with previews, role context, improvement ideas, and AI review.",
         "reading",
         "green",
       )
@@ -1609,84 +2165,73 @@ def main():
 
           st.info(f"Suggested reading path with {len(reading_path)} files (~{total_minutes} minutes). Code previews are buffered and scroll inside each reader.")
 
-          st.markdown("")
+          reading_options = {
+            idx: f"{item.order}. {item.path} ({item.estimated_minutes} min)"
+            for idx, item in enumerate(reading_path)
+          }
+          selected_reading_idx = st.selectbox(
+            "Choose one file to read:",
+            options=list(reading_options.keys()),
+            format_func=lambda idx: reading_options[idx],
+            key="selected_reading_item",
+          )
 
-          for item in reading_path:
-            # Get file info for role display
-            file_info = next((f for f in snapshot.files if f.path == item.path), None)
-            if not file_info:
-              continue
+          item = reading_path[selected_reading_idx]
+          file_info = next((f for f in snapshot.files if f.path == item.path), None)
 
-            role_badge = f"*{file_info.role.replace('_', ' ').title()}*"
+          if file_info:
+            render_metadata_chips([
+              ("Step", item.order),
+              ("Role", file_info.role.replace("_", " ").title()),
+              ("Language", file_info.language),
+              ("Time", f"{item.estimated_minutes} min"),
+            ])
 
-            with st.expander(f"**{item.order}. {item.path}** - {item.estimated_minutes} min {role_badge}", expanded=False):
-              render_metadata_chips([
-                ("Role", file_info.role.replace("_", " ").title()),
-                ("Language", file_info.language),
-                ("Lines", file_info.line_count),
-                ("Time", f"{item.estimated_minutes} min"),
-              ])
+            render_mini_label("Why read this", "reading", "green")
+            st.markdown(item.reason)
 
-              st.markdown("---")
+            if file_info.text_preview and not file_info.skipped:
+              render_mini_label("Read", "file", tone_for_role(file_info.role))
+              is_truncated = (
+                len(file_info.text_preview) >= MAX_TEXT_PREVIEW_CHARS or
+                file_info.size_bytes > len(file_info.text_preview.encode("utf-8"))
+              )
+              render_code_viewer(
+                file_info.text_preview,
+                get_language_for_st_code(file_info),
+                key=f"reading_{item.order}_{file_info.path}",
+                title=file_info.path,
+              )
+              if is_truncated:
+                st.caption(f"Preview is partial - file has {file_info.line_count} lines ({file_info.size_bytes:,} bytes)")
 
-              # Why read this
-              render_mini_label("Why read this", "reading", "green")
-              st.markdown(item.reason)
-              st.markdown("")
-
-              # Read section - file preview
-              if file_info.text_preview and not file_info.skipped:
-                render_mini_label("Read", "file", tone_for_role(file_info.role))
-
-                is_truncated = (
-                  len(file_info.text_preview) >= MAX_TEXT_PREVIEW_CHARS or
-                  file_info.size_bytes > len(file_info.text_preview.encode('utf-8'))
-                )
-
-                render_code_viewer(
-                  file_info.text_preview,
-                  get_language_for_st_code(file_info),
-                  key=f"reading_{item.order}_{file_info.path}",
-                  title=file_info.path,
-                )
-
-                if is_truncated:
-                  st.caption(f"*Preview is partial - file has {file_info.line_count} lines ({file_info.size_bytes:,} bytes)*")
-
-                st.markdown("")
-
-              # Understand section
+            col_understand, col_improve = st.columns(2)
+            with col_understand:
               render_mini_label("Understand", "overview", "blue")
-              understand_points = get_understand_points(file_info)
-              understand_df = pd.DataFrame({"Focus": understand_points})
+              understand_df = pd.DataFrame({"Focus": get_understand_points(file_info)})
               st.dataframe(understand_df, use_container_width=True, hide_index=True)
-              st.markdown("")
-
-              # Improve section
+            with col_improve:
               render_mini_label("Improve", "workplans", "orange")
-              improvement_ideas = get_improvement_ideas(file_info)
-              improvement_df = pd.DataFrame({"Idea": improvement_ideas})
+              improvement_df = pd.DataFrame({"Idea": get_improvement_ideas(file_info)})
               st.dataframe(improvement_df, use_container_width=True, hide_index=True)
-              st.markdown("")
 
-              # AI Assistant Action
-              render_mini_label("AI Assistant Action", "assistant", "purple")
+            render_mini_label("AI Review", "assistant", "purple")
+            ai_status = get_ai_status()
+            if ai_status.is_ready:
+              if st.button(f"Review {file_info.name}", key=f"ai_reading_{item.order}_{file_info.path}"):
+                routes = st.session_state.get("routes", [])
+                def build_request():
+                  return build_file_context(file_info, snapshot, routes) # type: ignore
+                result = run_assistant(f"reading_{file_info.path}", f"Reading: {file_info.name}", build_request, snapshot)
 
-              ai_status, _ = get_ai_status_info()
-              if ai_status == "ready":
-                if st.button(f"Ask AI to explain {file_info.name}", key=f"ai_reading_{item.order}_{file_info.path}"):
-                  routes = st.session_state.get("routes", [])
-                  def build_request():
-                    return build_file_context(file_info, snapshot, routes) # type: ignore
-                  result = run_assistant(f"reading_{file_info.path}", f"Reading: {file_info.name}", build_request, snapshot)
-
-                # Display result if exists
-                section_key = f"reading_{file_info.path}"
-                if "assistant_outputs" in st.session_state and section_key in st.session_state["assistant_outputs"]:
-                  result = st.session_state["assistant_outputs"][section_key]
-                  render_assistant_result(result, "AI-assisted explanation")
-              else:
-                st.caption("AI Assistant not enabled")
+              section_key = f"reading_{file_info.path}"
+              if "assistant_outputs" in st.session_state and section_key in st.session_state["assistant_outputs"]:
+                result = st.session_state["assistant_outputs"][section_key]
+                render_assistant_result(result, "AI-assisted file review")
+            else:
+              tab_caption = format_ai_status_for_tab(ai_status)
+              if tab_caption:
+                st.caption(tab_caption)
 
         else:
           st.warning("No reading path generated")
@@ -1696,7 +2241,7 @@ def main():
           {"Section": "Read", "Purpose": "Syntax-highlighted code previews"},
           {"Section": "Understand", "Purpose": "What to look for in each file"},
           {"Section": "Improve", "Purpose": "Concrete improvement suggestions"},
-          {"Section": "AI Assistant Action", "Purpose": "Optional AI-assisted explanations"},
+          {"Section": "AI Review", "Purpose": "Optional evidence-cited reviewer notes"},
         ])
         st.dataframe(reading_features_df, use_container_width=True, hide_index=True)
 
@@ -1728,75 +2273,78 @@ def main():
             filtered_cards = [c for c in component_cards if c.role == selected_role]
 
           if filtered_cards:
-            for card in filtered_cards:
-              with st.expander(f"**{card.title}** - {card.path}"):
-                # Role and why it matters
-                render_component_intro(
-                  card.role,
-                  card.path,
-                  card.why_it_matters,
-                  tone_for_role(card.role),
-                )
+            selected_card_idx = st.selectbox(
+              "Choose one component:",
+              range(len(filtered_cards)),
+              format_func=lambda idx: f"{filtered_cards[idx].title} - {filtered_cards[idx].path}",
+              key=f"selected_component_{selected_role}",
+            )
+            card = filtered_cards[selected_card_idx]
 
-                # Detected items section (only if present)
-                if card.detected_items:
-                  render_mini_label("Detected Evidence", "shield", "blue")
-                  evidence_df = pd.DataFrame({"Evidence": card.detected_items})
-                  st.dataframe(evidence_df, use_container_width=True, hide_index=True)
-                  st.markdown("")
+            render_component_intro(
+              card.role,
+              card.path,
+              card.why_it_matters,
+              tone_for_role(card.role),
+            )
 
-                  # Try to show code snippet for first detected item
-                  file_info = next((f for f in snapshot.files if f.path == card.path), None)
-                  if file_info and file_info.text_preview:
-                    first_item = card.detected_items[0]
-                    # Extract pattern from detected item
-                    pattern = first_item.split("(")[0] if "(" in first_item else first_item
-                    snippet = extract_code_snippet(file_info, pattern)
-                    if snippet:
-                      render_mini_label("Code Snippet", "file", tone_for_role(file_info.role))
-                      render_code_viewer(
-                        snippet,
-                        get_language_for_st_code(file_info),
-                        key=f"component_snippet_{card.path}",
-                        title=card.path,
-                        compact_chars=2_000,
-                        expanded_chars=6_000,
-                        compact_height=240,
-                        expanded_height=520,
-                      )
-                      st.markdown("")
+            if card.detected_items:
+              render_mini_label("Detected Evidence", "shield", "blue")
+              evidence_df = pd.DataFrame({"Evidence": card.detected_items})
+              st.dataframe(evidence_df, use_container_width=True, hide_index=True)
 
-                # Connected files section (only if present)
-                if card.connected_to:
-                  render_mini_label("Connected Files", "architecture", "purple")
-                  connected_df = pd.DataFrame({"File": card.connected_to})
-                  st.dataframe(connected_df, use_container_width=True, hide_index=True)
-                  st.markdown("")
+              with st.expander("Code evidence", expanded=False):
+                file_info = next((f for f in snapshot.files if f.path == card.path), None)
+                if file_info and file_info.text_preview:
+                  first_item = card.detected_items[0]
+                  pattern = first_item.split("(")[0] if "(" in first_item else first_item
+                  snippet = extract_code_snippet(file_info, pattern)
+                  if snippet:
+                    render_code_viewer(
+                      snippet,
+                      get_language_for_st_code(file_info),
+                      key=f"component_snippet_{card.path}",
+                      title=card.path,
+                      compact_chars=2_000,
+                      expanded_chars=6_000,
+                      compact_height=240,
+                      expanded_height=520,
+                    )
+                  else:
+                    st.caption("No compact snippet matched the detected evidence.")
 
-                # Test ideas section (only if present)
-                if card.suggested_test_ideas:
-                  render_mini_label("Suggested Test Ideas", "tests", "purple")
-                  test_df = pd.DataFrame({"Idea": card.suggested_test_ideas})
-                  st.dataframe(test_df, use_container_width=True, hide_index=True)
-                  st.markdown("")
+            col_connections, col_tests = st.columns(2)
+            with col_connections:
+              render_mini_label("Connected Files", "architecture", "purple")
+              if card.connected_to:
+                connected_df = pd.DataFrame({"File": card.connected_to})
+                st.dataframe(connected_df, use_container_width=True, hide_index=True)
+              else:
+                st.caption("No direct connections detected.")
+            with col_tests:
+              render_mini_label("Suggested Test Ideas", "tests", "purple")
+              if card.suggested_test_ideas:
+                test_df = pd.DataFrame({"Idea": card.suggested_test_ideas})
+                st.dataframe(test_df, use_container_width=True, hide_index=True)
+              else:
+                st.caption("No test ideas generated for this card.")
 
-                # AI Assistant Action
-                render_mini_label("AI Assistant Action", "assistant", "purple")
+            render_mini_label("AI Review", "assistant", "purple")
+            ai_status = get_ai_status()
+            if ai_status.is_ready:
+              if st.button("Review risks and tests", key=f"ai_component_{card.path}"):
+                def build_request():
+                  return build_component_context(card, snapshot)
+                result = run_assistant(f"component_{card.path}", f"Component: {card.title}", build_request, snapshot)
 
-                ai_status, _ = get_ai_status_info()
-                if ai_status == "ready":
-                  if st.button(f"Ask AI for risks/tests", key=f"ai_component_{card.path}"):
-                    def build_request():
-                      return build_component_context(card, snapshot)
-                    result = run_assistant(f"component_{card.path}", f"Component: {card.title}", build_request, snapshot)
-
-                  # Display result if exists
-                  section_key = f"component_{card.path}"
-                  if "assistant_outputs" in st.session_state and section_key in st.session_state["assistant_outputs"]:
-                    result = st.session_state["assistant_outputs"][section_key]
-                    render_assistant_result(result, "AI-assisted component analysis")
-                else:
-                  st.caption("AI Assistant not enabled")
+              section_key = f"component_{card.path}"
+              if "assistant_outputs" in st.session_state and section_key in st.session_state["assistant_outputs"]:
+                result = st.session_state["assistant_outputs"][section_key]
+                render_assistant_result(result, "AI-assisted component review")
+            else:
+              tab_caption = format_ai_status_for_tab(ai_status)
+              if tab_caption:
+                st.caption(tab_caption)
 
           else:
             st.warning("No component cards match the selected role")
@@ -1943,13 +2491,13 @@ def main():
 
         st.markdown("---")
 
-        # AI Test Plan
-        render_mini_label("AI Test Plan", "assistant", "purple")
-        st.caption("AI-assisted test recommendations")
+        # AI Test Review
+        render_mini_label("AI Test Review", "assistant", "purple")
+        st.caption("Evidence-cited AI review of the deterministic test intelligence.")
 
-        ai_status, _ = get_ai_status_info()
-        if ai_status == "ready":
-          if st.button("Generate AI Test Plan", key="ai_test_plan"):
+        ai_status = get_ai_status()
+        if ai_status.is_ready:
+          if st.button("Generate Test Review", key="ai_test_plan"):
             def build_request():
               return build_test_context(test_intel, snapshot)
             result = run_assistant("test_plan", "Test Intelligence", build_request, snapshot)
@@ -1957,9 +2505,11 @@ def main():
           # Display result if exists
           if "assistant_outputs" in st.session_state and "test_plan" in st.session_state["assistant_outputs"]:
             result = st.session_state["assistant_outputs"]["test_plan"]
-            render_assistant_result(result, "AI-assisted test plan")
+            render_assistant_result(result, "AI-assisted test review")
         else:
-          st.caption("AI Assistant not enabled")
+          tab_caption = format_ai_status_for_tab(ai_status)
+          if tab_caption:
+            st.caption(tab_caption)
 
       else:
         st.info("Generate an onboarding quest to see test intelligence.")
@@ -1969,15 +2519,15 @@ def main():
           {"Section": "Missing Coverage", "Purpose": "Routes and components that appear untested"},
           {"Section": "Quality Signals", "Purpose": "Assertions, fixtures, mocks, and test patterns"},
           {"Section": "Suggested Tests", "Purpose": "Concrete next test cases to add"},
-          {"Section": "AI Test Plan", "Purpose": "Optional AI-assisted test recommendations"},
+          {"Section": "AI Test Review", "Purpose": "Optional evidence-cited coverage review"},
         ])
         st.dataframe(test_features_df, use_container_width=True, hide_index=True)
 
     # Tab 6: Work Plans
     with tabs[5]:
       render_section_header(
-        "Work Plans & Agent Workflows",
-        "Evidence-backed milestones, tasks, and guided workflows for follow-up development.",
+        "Work Plans",
+        "Evidence-backed epics, tasks, and milestones for follow-up development.",
         "workplans",
         "slate",
       )
@@ -1986,15 +2536,13 @@ def main():
         work_plan = st.session_state["work_plan"]
 
         # Summary metrics
-        col1, col2, col3, col4 = st.columns(4)
+        col1, col2, col3 = st.columns(3)
         with col1:
           st.metric("Epics", len(work_plan.epics))
         with col2:
           st.metric("Tasks", len(work_plan.tasks))
         with col3:
           st.metric("Milestones", len(work_plan.milestones))
-        with col4:
-          st.metric("Workflows", len(work_plan.workflows))
 
         st.markdown("---")
 
@@ -2058,100 +2606,307 @@ def main():
             criteria_df = pd.DataFrame({"Criterion": task.acceptance_criteria})
             st.dataframe(criteria_df, use_container_width=True, hide_index=True)
 
+      else:
+        st.info("Generate an onboarding quest to see work plans.")
+        work_plan_features_df = pd.DataFrame([
+          {"Area": "Epics", "Purpose": "High-level categories of work"},
+          {"Area": "Tasks", "Purpose": "Specific improvements with evidence and acceptance criteria"},
+          {"Area": "Milestones", "Purpose": "Grouped tasks for phased implementation"},
+        ])
+        st.dataframe(work_plan_features_df, use_container_width=True, hide_index=True)
+        st.caption("Agent workflows have their own workspace tab.")
+
+    # Agent Workflows tab
+    with workflows_tab:
+      render_section_header(
+        "Agent Workflows",
+        "Step-by-step workflows ready to hand to IBM Bob or another coding assistant.",
+        "workplans",
+        "slate",
+      )
+
+      if "work_plan" in st.session_state:
+        work_plan = st.session_state["work_plan"]
+        st.metric("Workflows", len(work_plan.workflows))
+        st.info("Each workflow is generated deterministically from the repo analysis and can be reviewed with optional AI.")
+
+        if work_plan.workflows:
+          workflow_idx = st.selectbox(
+            "Choose one workflow:",
+            range(len(work_plan.workflows)),
+            format_func=lambda idx: work_plan.workflows[idx].title,
+            key="selected_workflow",
+          )
+          workflow = work_plan.workflows[workflow_idx]
+          st.markdown(f"**Goal:** {workflow.goal}")
+
+          col1, col2 = st.columns(2)
+          with col1:
+            render_mini_label("Files to read", "reading", "green")
+            read_df = pd.DataFrame({"File": workflow.files_to_read})
+            st.dataframe(read_df, use_container_width=True, hide_index=True)
+          with col2:
+            render_mini_label("Files likely to change", "file", "orange")
+            change_df = pd.DataFrame({"File": workflow.files_to_change})
+            st.dataframe(change_df, use_container_width=True, hide_index=True)
+
+          render_mini_label("Ordered steps", "workplans", "slate")
+          steps_df = pd.DataFrame({
+            "Step": range(1, len(workflow.ordered_steps) + 1),
+            "Action": workflow.ordered_steps,
+          })
+          st.dataframe(steps_df, use_container_width=True, hide_index=True)
+
+          render_mini_label("Validation steps", "shield", "green")
+          validation_df = pd.DataFrame({"Validation": workflow.validation_steps})
+          st.dataframe(validation_df, use_container_width=True, hide_index=True)
+
+          st.markdown(f"**Expected output:** {workflow.expected_output}")
+
+          render_mini_label("AI Workflow Review", "assistant", "purple")
+          ai_status = get_ai_status()
+          section_key = f"workflow_{workflow_idx}"
+          if ai_status.is_ready:
+            if st.button("Review this workflow", key=f"ai_workflow_{workflow_idx}"):
+              def build_request():
+                return build_workflow_context(work_plan, snapshot)
+              result = run_assistant(section_key, f"Workflow: {workflow.title}", build_request, snapshot)
+
+            if "assistant_outputs" in st.session_state and section_key in st.session_state["assistant_outputs"]:
+              result = st.session_state["assistant_outputs"][section_key]
+              render_assistant_result(result, "AI-assisted workflow review")
+          else:
+            tab_caption = format_ai_status_for_tab(ai_status)
+            if tab_caption:
+              st.caption(tab_caption)
+        else:
+          st.caption("No agent workflows generated.")
+
         st.markdown("---")
-
-        # Agent Workflows
-        render_mini_label("Agent Workflows", "workplans", "slate")
-        st.info("These workflows are ready to use with an AI coding assistant.")
-
-        for workflow_idx, workflow in enumerate(work_plan.workflows):
-          with st.expander(f"**{workflow.title}**", expanded=False):
-            st.markdown(f"**Goal:** {workflow.goal}")
-            st.markdown("")
-
-            col1, col2 = st.columns(2)
-
-            with col1:
-              render_mini_label("Files to read", "reading", "green")
-              read_df = pd.DataFrame({"File": workflow.files_to_read})
-              st.dataframe(read_df, use_container_width=True, hide_index=True)
-
-            with col2:
-              render_mini_label("Files likely to change", "file", "orange")
-              change_df = pd.DataFrame({"File": workflow.files_to_change})
-              st.dataframe(change_df, use_container_width=True, hide_index=True)
-
-            st.markdown("")
-            render_mini_label("Ordered steps", "workplans", "slate")
-            steps_df = pd.DataFrame({
-              "Step": range(1, len(workflow.ordered_steps) + 1),
-              "Action": workflow.ordered_steps
-            })
-            st.dataframe(steps_df, use_container_width=True, hide_index=True)
-
-            st.markdown("")
-            render_mini_label("Validation steps", "shield", "green")
-            validation_df = pd.DataFrame({"Validation": workflow.validation_steps})
-            st.dataframe(validation_df, use_container_width=True, hide_index=True)
-
-            st.markdown("")
-            st.markdown(f"**Expected output:** {workflow.expected_output}")
-
-            st.markdown("")
-            ai_status, _ = get_ai_status_info()
-            section_key = f"workflow_{workflow_idx}"
-            if ai_status == "ready":
-              if st.button("Ask AI to refine this workflow", key=f"ai_workflow_{workflow_idx}"):
-                def build_request():
-                  return build_workflow_context(work_plan, snapshot)
-                result = run_assistant(section_key, f"Workflow: {workflow.title}", build_request, snapshot)
-
-              if "assistant_outputs" in st.session_state and section_key in st.session_state["assistant_outputs"]:
-                result = st.session_state["assistant_outputs"][section_key]
-                render_assistant_result(result, "AI-assisted workflow refinement")
-            else:
-              st.caption("AI Assistant not enabled")
-
-        st.markdown("---")
-
-        # Export work plan
-        render_mini_label("Export Work Plan", "export", "blue")
-
-        if st.button("Generate Work Plan Markdown", type="primary"):
+        render_mini_label("Export Workflows", "export", "blue")
+        if st.button("Generate Workflow Markdown", type="primary"):
           work_plan_md = export_workflows_markdown(work_plan, snapshot.source_name)
           st.session_state["work_plan_md"] = work_plan_md
-          st.success("Work plan Markdown generated!")
+          st.success("Workflow Markdown generated!")
+
+        if "work_plan_md" in st.session_state and not isinstance(st.session_state["work_plan_md"], str):
+          st.session_state["work_plan_md"] = export_workflows_markdown(work_plan, snapshot.source_name)
 
         if "work_plan_md" in st.session_state:
-          st.download_button(
-            label="Download Work Plan",
-            data=st.session_state["work_plan_md"],
-            file_name=f"{snapshot.source_name}_work_plan.md",
-            mime="text/markdown",
-          )
+          workflow_markdown = st.session_state["work_plan_md"]
+          if workflow_markdown and isinstance(workflow_markdown, str):
+            st.download_button(
+              label="Download Workflows",
+              data=workflow_markdown.encode("utf-8"),
+              file_name=f"{snapshot.source_name}_agent_workflows.md",
+              mime="text/markdown",
+            )
+          else:
+            st.error("Workflow markdown is not available or invalid.")
 
-          with st.expander("Preview Work Plan Markdown"):
+          with st.expander("Preview Workflow Markdown"):
             render_code_viewer(
-              st.session_state["work_plan_md"],
+              workflow_markdown,
               "markdown",
               key="work_plan_markdown",
-              title="Work plan Markdown",
+              title="Workflow Markdown",
               compact_chars=2_000,
               expanded_chars=MAX_TEXT_PREVIEW_CHARS,
               compact_height=320,
               expanded_height=680,
             )
-
       else:
-        st.info("Generate an onboarding quest to see work plans and agent workflows.")
-        work_plan_features_df = pd.DataFrame([
-          {"Area": "Epics", "Purpose": "High-level categories of work"},
-          {"Area": "Tasks", "Purpose": "Specific improvements with evidence and acceptance criteria"},
-          {"Area": "Milestones", "Purpose": "Grouped tasks for phased implementation"},
-          {"Area": "Agent workflows", "Purpose": "Step-by-step instructions ready for an AI coding assistant"},
-        ])
-        st.dataframe(work_plan_features_df, use_container_width=True, hide_index=True)
-        st.caption("These are generated deterministically from repo analysis and are ready to use with AI coding assistants.")
+        st.info("Generate an onboarding quest to see agent workflows.")
+
+    # AI Recommendations Tab
+    with recommendations_tab:
+      render_section_header(
+        "AI Code Recommendations",
+        "AI-generated actionable recommendations grounded in repository evidence.",
+        "assistant",
+        "purple",
+      )
+
+      ai_status = get_ai_status()
+      
+      if not ai_status.is_ready:
+        st.info("AI Assistant is disabled. Enable it to generate code recommendations.")
+        tab_caption = format_ai_status_for_tab(ai_status)
+        if tab_caption:
+          st.caption(tab_caption)
+      else:
+        if "work_plan" in st.session_state:
+          work_plan = st.session_state["work_plan"]
+          
+          # Generate recommendations button
+          if st.button("Generate AI Recommendations", type="primary"):
+            from repoquest.assistant_context import build_context_pack
+            from repoquest.recommendation_generator import generate_recommendation_summary
+            
+            with st.spinner("Generating AI recommendations..."):
+              # Build context pack
+              context_pack = build_context_pack(
+                snapshot, fingerprint, routes, component_cards, work_plan
+              )
+              
+              # Get provider and generate recommendations
+              provider = get_assistant_provider()
+              result = provider.generate_recommendations(
+                snapshot, fingerprint, routes, component_cards, work_plan, context_pack
+              )
+              
+              st.session_state["ai_recommendations"] = result
+              st.success(f"Generated {len(result.trusted_recommendations)} trusted recommendations")
+          
+          # Display recommendations if available
+          if "ai_recommendations" in st.session_state:
+            result = st.session_state["ai_recommendations"]
+            
+            # Provider info
+            col1, col2, col3 = st.columns(3)
+            with col1:
+              st.metric("Provider", result.provider)
+            with col2:
+              st.metric("Model", result.model)
+            with col3:
+              st.metric("Trusted Recommendations", len(result.trusted_recommendations))
+            
+            if result.warnings:
+              with st.expander("⚠️ Warnings"):
+                for warning in result.warnings:
+                  st.warning(warning)
+            
+            st.markdown("---")
+            
+            # Group by priority
+            from repoquest.recommendation_validator import (
+              sort_recommendations_by_priority,
+            )
+            
+            trusted = result.trusted_recommendations
+            if not trusted:
+              st.info("No trusted recommendations generated. Try adjusting your repository or AI provider settings.")
+            else:
+              # Sort by priority
+              sorted_recs = sort_recommendations_by_priority(trusted)
+              
+              # Display by priority
+              for priority in ["high", "medium", "low"]:
+                priority_recs = [r for r in sorted_recs if r.priority == priority]
+                if not priority_recs:
+                  continue
+                
+                priority_color = {"high": "red", "medium": "orange", "low": "blue"}[priority]
+                render_mini_label(f"{priority.upper()} Priority", "shield", priority_color)
+                
+                for rec in priority_recs:
+                  with st.expander(f"**{rec.title}** ({rec.category})"):
+                    # Validation status with standardized formatting
+                    validation_msg = format_recommendation_validation(rec)
+                    if rec.validation_status == "valid":
+                      st.success(validation_msg)
+                    elif rec.validation_status == "downgraded":
+                      st.warning(validation_msg)
+                    elif rec.validation_status == "invalid":
+                      st.error(validation_msg)
+                    
+                    if rec.validation_warnings and len(rec.validation_warnings) > 2:
+                      with st.expander("All Validation Warnings"):
+                        for warning in rec.validation_warnings:
+                          st.caption(f"• {warning}")
+                    
+                    # Confidence
+                    st.progress(rec.confidence, text=f"Confidence: {rec.confidence:.0%}")
+                    
+                    # Files
+                    if rec.files:
+                      render_mini_label("Files", "file", "blue")
+                      files_df = pd.DataFrame({"File": rec.files})
+                      st.dataframe(files_df, use_container_width=True, hide_index=True)
+                    
+                    # Evidence
+                    if rec.evidence:
+                      render_mini_label("Evidence", "shield", "green")
+                      evidence_df = pd.DataFrame({"Evidence": rec.evidence})
+                      st.dataframe(evidence_df, use_container_width=True, hide_index=True)
+                    
+                    # Rationale
+                    st.markdown("**Why it matters:**")
+                    st.markdown(rec.rationale)
+                    
+                    # Proposed change
+                    st.markdown("**Proposed change:**")
+                    st.markdown(rec.proposed_change_summary)
+                    
+                    # Test plan
+                    if rec.test_plan:
+                      render_mini_label("Test Plan", "test", "cyan")
+                      test_df = pd.DataFrame({"Step": rec.test_plan})
+                      st.dataframe(test_df, use_container_width=True, hide_index=True)
+                    
+                    # Workflow
+                    st.markdown("**Workflow:**")
+                    st.markdown(rec.workflow)
+                    
+                    # Copyable prompt
+                    render_mini_label("AI Assistant Action", "assistant", "purple")
+                    prompt = f"""Implement: {rec.title}
+
+Category: {rec.category}
+Priority: {rec.priority}
+
+Files to review:
+{chr(10).join(f'- {f}' for f in rec.files[:5])}
+
+Rationale:
+{rec.rationale}
+
+Proposed change:
+{rec.proposed_change_summary}
+
+Test plan:
+{chr(10).join(f'{i+1}. {step}' for i, step in enumerate(rec.test_plan))}
+
+Workflow:
+{rec.workflow}
+
+IMPORTANT: Do not execute uploaded code. Only analyze and generate improvements."""
+                    
+                    st.code(prompt, language="text")
+                    if prompt and isinstance(prompt, str):
+                      st.download_button(
+                        "Copy Prompt",
+                        prompt,
+                        file_name=f"{rec.title.lower().replace(' ', '_')}_prompt.txt",
+                        key=f"download_rec_{rec.title}",
+                      )
+              
+              # Summary export
+              st.markdown("---")
+              render_mini_label("Export Recommendations", "export", "blue")
+              
+              if st.button("Generate Recommendations Summary"):
+                from repoquest.recommendation_generator import generate_recommendation_summary
+                summary = generate_recommendation_summary(result)
+                st.session_state["recommendations_summary"] = summary
+                st.success("Summary generated!")
+              
+              if "recommendations_summary" in st.session_state:
+                summary_data = st.session_state["recommendations_summary"]
+                if summary_data and isinstance(summary_data, str):
+                  st.download_button(
+                    "Download Recommendations",
+                    summary_data,
+                    file_name=f"{snapshot.source_name}_ai_recommendations.md",
+                    mime="text/markdown",
+                  )
+                else:
+                  st.error("Recommendations summary is not available or invalid.")
+                
+                with st.expander("Preview Summary"):
+                  st.markdown(st.session_state["recommendations_summary"])
+        else:
+          st.info("Generate an onboarding quest first to see AI recommendations.")
 
     # Tab 7: Quest & Quiz
     with tabs[6]:
@@ -2400,29 +3155,35 @@ def main():
         else:
           st.warning("Please generate an onboarding quest first.")
 
-      if "generated_doc" in st.session_state:
+      if "generated_doc" in st.session_state and st.session_state["generated_doc"]:
         with st.expander("Preview Generated Guide"):
-          preview = st.session_state["generated_doc"][:3000]
-          if len(st.session_state["generated_doc"]) > 3000:
-            preview += "\n\n... (truncated, see Export tab for full document)"
-          st.markdown(preview)
+          doc = st.session_state["generated_doc"]
+          if isinstance(doc, str):
+            preview = doc[:3000]
+            if len(doc) > 3000:
+              preview += "\n\n... (truncated, see Export tab for full document)"
+            st.markdown(preview)
+          else:
+            st.warning("Generated document is not in the expected format.")
 
       st.markdown("---")
-      render_mini_label("AI Assistant", "assistant", "purple")
-      st.caption("Generate optional AI-assisted notes for documentation improvements.")
+      render_mini_label("AI Documentation Review", "assistant", "purple")
+      st.caption("Generate optional evidence-cited notes for documentation improvements.")
 
-      ai_status, _ = get_ai_status_info()
+      ai_status = get_ai_status()
       if ai_status == "ready" and "fingerprint" in st.session_state:
-        if st.button("Generate AI-assisted guide notes", key="ai_documentation"):
+        if st.button("Generate Documentation Review", key="ai_documentation"):
           def build_request():
             return build_documentation_context(snapshot, st.session_state["fingerprint"]) # type: ignore
           result = run_assistant("documentation", "Documentation Notes", build_request, snapshot)
 
         if "assistant_outputs" in st.session_state and "documentation" in st.session_state["assistant_outputs"]:
           result = st.session_state["assistant_outputs"]["documentation"]
-          render_assistant_result(result, "AI-assisted documentation notes")
+          render_assistant_result(result, "AI-assisted documentation review")
       else:
-        st.caption("AI Assistant not enabled")
+        tab_caption = format_ai_status_for_tab(ai_status)
+        if tab_caption:
+          st.caption(tab_caption)
 
     # Tab 9: Export
     with tabs[8]:
@@ -2464,30 +3225,35 @@ def main():
           st.markdown(markdown_content)
 
         # Download button
-        st.download_button(
-          label="Download Onboarding Guide",
-          data=markdown_content,
-          file_name=f"{snapshot.source_name}_onboarding_guide.md",
-          mime="text/markdown",
-          type="primary"
-        )
+        if markdown_content and isinstance(markdown_content, str):
+          st.download_button(
+            label="Download Onboarding Guide",
+            data=markdown_content,
+            file_name=f"{snapshot.source_name}_onboarding_guide.md",
+            mime="text/markdown",
+            type="primary"
+          )
+        else:
+          st.error("Generated document is not available or invalid.")
 
         st.markdown("---")
-        render_mini_label("AI-assisted Guide Notes", "assistant", "purple")
+        render_mini_label("AI Export Review", "assistant", "purple")
         st.caption("Optional notes to help refine the exported onboarding guide.")
 
-        ai_status, _ = get_ai_status_info()
+        ai_status = get_ai_status()
         if ai_status == "ready" and "fingerprint" in st.session_state:
-          if st.button("Generate AI-assisted guide notes", key="ai_export_notes"):
+          if st.button("Generate Export Review", key="ai_export_notes"):
             def build_request():
               return build_documentation_context(snapshot, st.session_state["fingerprint"]) # type: ignore
             result = run_assistant("export_notes", "Export Guide Notes", build_request, snapshot)
 
           if "assistant_outputs" in st.session_state and "export_notes" in st.session_state["assistant_outputs"]:
             result = st.session_state["assistant_outputs"]["export_notes"]
-            render_assistant_result(result, "AI-assisted guide notes")
+            render_assistant_result(result, "AI-assisted export review")
         else:
-          st.caption("AI Assistant not enabled")
+          tab_caption = format_ai_status_for_tab(ai_status)
+          if tab_caption:
+            st.caption(tab_caption)
       else:
         st.info("Generate an onboarding quest to export the guide.")
         guide_use_df = pd.DataFrame([
@@ -2498,8 +3264,8 @@ def main():
         ])
         st.dataframe(guide_use_df, use_container_width=True, hide_index=True)
 
-    # Tab 10: Built with IBM Bob
-    with tabs[9]:
+    # About/Built with IBM Bob content moved to the persistent sidebar.
+    if False:
       render_section_header(
         "Built with IBM Bob",
         "How the development partner helped scaffold, implement, test, and document RepoQuest.",

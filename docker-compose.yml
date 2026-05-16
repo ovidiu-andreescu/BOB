@@ -1,0 +1,65 @@
+# RepoQuest Docker Compose Configuration
+# ========================================
+# Supports multiple deployment profiles:
+#
+# 1. Deterministic only (default):
+#    docker compose up --build repoquest
+#
+# 2. Mock assistant service:
+#    REPOQUEST_AI_ENABLED=true \
+#    REPOQUEST_ASSISTANT_SERVICE_URL=http://assistant:8765 \
+#    REPOQUEST_ASSISTANT_SERVICE_PROVIDER=mock \
+#    docker compose --profile assistant up --build
+#
+# 3. Cloud assistant service (Claude):
+#    REPOQUEST_AI_ENABLED=true \
+#    REPOQUEST_ASSISTANT_SERVICE_URL=http://assistant:8765 \
+#    CLAUDE_API_KEY=your_key_here \
+#    docker compose --profile assistant up --build
+#
+# 4. Local model assistant service:
+#    REPOQUEST_AI_ENABLED=true \
+#    REPOQUEST_ASSISTANT_SERVICE_URL=http://assistant:8765 \
+#    REPOQUEST_ASSISTANT_SERVICE_PROVIDER=local \
+#    REPOQUEST_LOCAL_MODEL_BASE_URL=http://host.docker.internal:11434/v1 \
+#    REPOQUEST_LOCAL_MODEL_NAME=llama3.1 \
+#    docker compose --profile assistant up --build
+
+services:
+  repoquest:
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile.app
+    ports:
+      - "8501:8501"
+    environment:
+      REPOQUEST_AI_ENABLED: "${REPOQUEST_AI_ENABLED:-false}"
+      REPOQUEST_ASSISTANT_SERVICE_URL: "${REPOQUEST_ASSISTANT_SERVICE_URL:-}"
+      REPOQUEST_ASSISTANT_SERVICE_TIMEOUT_SECONDS: "${REPOQUEST_ASSISTANT_SERVICE_TIMEOUT_SECONDS:-45}"
+      # Direct provider configuration (when not using assistant service)
+      REPOQUEST_ASSISTANT_PROVIDER: "${REPOQUEST_ASSISTANT_PROVIDER:-}"
+      CLAUDE_API_KEY: "${CLAUDE_API_KEY:-}"
+      CLAUDE_MODEL: "${CLAUDE_MODEL:-claude-sonnet-4-20250514}"
+      REPOQUEST_LOCAL_MODEL_BASE_URL: "${REPOQUEST_LOCAL_MODEL_BASE_URL:-}"
+      REPOQUEST_LOCAL_MODEL_NAME: "${REPOQUEST_LOCAL_MODEL_NAME:-}"
+
+  assistant:
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile.assistant
+    profiles:
+      - assistant
+    ports:
+      - "8765:8765"
+    environment:
+      REPOQUEST_AI_ENABLED: "${REPOQUEST_AI_ENABLED:-false}"
+      REPOQUEST_ASSISTANT_SERVICE_PROVIDER: "${REPOQUEST_ASSISTANT_SERVICE_PROVIDER:-}"
+      # Cloud provider configuration
+      CLAUDE_API_KEY: "${CLAUDE_API_KEY:-}"
+      CLAUDE_MODEL: "${CLAUDE_MODEL:-claude-sonnet-4-20250514}"
+      # Local model configuration
+      REPOQUEST_LOCAL_MODEL_BASE_URL: "${REPOQUEST_LOCAL_MODEL_BASE_URL:-}"
+      REPOQUEST_LOCAL_MODEL_NAME: "${REPOQUEST_LOCAL_MODEL_NAME:-}"
+    # Allow access to host network for local model servers
+    extra_hosts:
+      - "host.docker.internal:host-gateway"

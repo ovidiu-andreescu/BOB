@@ -69,4 +69,4 @@ Code previews do not belong in the Architecture Map inspector. Full file preview
 - The default graph tells the production application story without test noise.
 - Test dependencies are still available in a dedicated graph/view.
 - Selecting a component leads directly to dependencies, route context, related tests, and optional assistant actions.
-- The input/sidebar controls are hidden after analysis so graph exploration has room on the page.
+- The input/sidebar controls remain available after analysis so source switching, upload status, limits, and AI Review status stay visible.

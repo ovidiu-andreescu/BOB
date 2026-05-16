@@ -2,7 +2,7 @@
 
 ## Overview
 
-RepoQuest includes an **optional AI assistant** powered by Claude that can provide additional insights beyond deterministic static analysis.
+RepoQuest includes an **optional AI assistant** that can provide additional insights beyond deterministic static analysis.
 
 **Important:** The AI assistant is:
 - **Disabled by default**
@@ -10,6 +10,229 @@ RepoQuest includes an **optional AI assistant** powered by Claude that can provi
 - **Manual-only** - never runs automatically
 - **Bounded** - only receives capped context packs, not entire repos
 - **Safe** - validates responses to prevent execution claims
+- **Multiple providers** - supports Claude, local models, and mock mode
+
+## Deployment Profiles
+
+RepoQuest supports multiple deployment profiles to accommodate different use cases, from public demos to private local development.
+
+### Profile Comparison
+
+| Profile | AI Enabled | Secrets Required | Network Calls | Use Case |
+|---------|-----------|------------------|---------------|----------|
+| **Deterministic** | No | None | None | Default, public demo, Streamlit Cloud |
+| **Mock Assistant** | Yes | None | None | Testing, CI/CD, development |
+| **Cloud Assistant** | Yes | API key | Claude API | Live demo with AI, development |
+| **Local Model** | Yes | None | Local only | Private/offline AI, experimentation |
+| **Service Assistant** | Yes | Varies | Varies | Async processing, scalability |
+
+### 1. Deterministic Code Assistant (Default)
+
+**Status:** Production-ready, recommended for public deployment
+
+**Features:**
+- No AI, no secrets, no external calls
+- Fully deterministic static analysis
+- Safe for Streamlit Community Cloud
+- Works offline
+- Zero API costs
+
+**Setup:**
+```bash
+# Local
+python scripts/run_local.py
+
+# Docker
+docker compose up --build repoquest
+
+# Streamlit Cloud
+# Deploy with no secrets required
+```
+
+**Environment:**
+```bash
+REPOQUEST_AI_ENABLED=false  # or unset
+```
+
+### 2. Mock AI Assistant
+
+**Status:** Development/testing only
+
+**Features:**
+- AI UI enabled with deterministic responses
+- No network calls
+- No API costs
+- Tests assistant integration
+- Validates UI flows
+
+**Setup:**
+```bash
+# Local
+REPOQUEST_AI_ENABLED=true \
+REPOQUEST_ASSISTANT_PROVIDER=mock \
+python scripts/run_local.py
+
+# Docker with service
+REPOQUEST_AI_ENABLED=true \
+REPOQUEST_ASSISTANT_SERVICE_URL=http://assistant:8765 \
+REPOQUEST_ASSISTANT_SERVICE_PROVIDER=mock \
+docker compose --profile assistant up --build
+```
+
+**Environment:**
+```bash
+REPOQUEST_AI_ENABLED=true
+REPOQUEST_ASSISTANT_PROVIDER=mock
+```
+
+### 3. Cloud AI Assistant (Claude)
+
+**Status:** Production-ready with API key
+
+**Features:**
+- Real Claude API integration
+- High-quality AI insights
+- Bounded context packs
+- Response validation
+- Deterministic fallback preserved
+
+**Setup:**
+```bash
+# Local
+REPOQUEST_AI_ENABLED=true \
+CLAUDE_API_KEY=your_key_here \
+python scripts/run_local.py
+
+# Docker with service
+REPOQUEST_AI_ENABLED=true \
+REPOQUEST_ASSISTANT_SERVICE_URL=http://assistant:8765 \
+CLAUDE_API_KEY=your_key_here \
+docker compose --profile assistant up --build
+
+# Streamlit Cloud
+# Add secrets in dashboard:
+# REPOQUEST_AI_ENABLED = "true"
+# CLAUDE_API_KEY = "your_key_here"
+```
+
+**Environment:**
+```bash
+REPOQUEST_AI_ENABLED=true
+CLAUDE_API_KEY=your_api_key_here
+CLAUDE_MODEL=claude-sonnet-4-20250514  # optional
+```
+
+**Requirements:**
+- Valid Anthropic API key
+- Network access to api.anthropic.com
+- API usage costs apply
+
+**Privacy:** Code snippets (max 800 chars each) sent to Claude API. See Privacy & Data section.
+
+### 4. Local Model Assistant
+
+**Status:** Experimental, for private/offline use
+
+**Features:**
+- No cloud API required
+- Works with local model servers
+- OpenAI-compatible endpoint support
+- Private/offline AI
+- No API costs (compute costs only)
+
+**Supported servers:**
+- Ollama (recommended)
+- LM Studio
+- llama.cpp server
+- Any OpenAI-compatible endpoint
+
+**Setup with Ollama:**
+```bash
+# 1. Install and start Ollama
+curl -fsSL https://ollama.com/install.sh | sh
+ollama pull llama3.1
+
+# 2. Run RepoQuest
+REPOQUEST_AI_ENABLED=true \
+REPOQUEST_ASSISTANT_PROVIDER=local \
+REPOQUEST_LOCAL_MODEL_BASE_URL=http://localhost:11434/v1 \
+REPOQUEST_LOCAL_MODEL_NAME=llama3.1 \
+python scripts/run_local.py
+
+# 3. Docker with service
+REPOQUEST_AI_ENABLED=true \
+REPOQUEST_ASSISTANT_SERVICE_URL=http://assistant:8765 \
+REPOQUEST_ASSISTANT_SERVICE_PROVIDER=local \
+REPOQUEST_LOCAL_MODEL_BASE_URL=http://host.docker.internal:11434/v1 \
+REPOQUEST_LOCAL_MODEL_NAME=llama3.1 \
+docker compose --profile assistant up --build
+```
+
+**Environment:**
+```bash
+REPOQUEST_AI_ENABLED=true
+REPOQUEST_ASSISTANT_PROVIDER=local
+REPOQUEST_LOCAL_MODEL_BASE_URL=http://localhost:11434/v1
+REPOQUEST_LOCAL_MODEL_NAME=llama3.1
+```
+
+**Notes:**
+- Local model quality varies by size and training
+- Responses may be slower than cloud APIs
+- Requires local compute resources
+- No data leaves your machine
+
+### 5. Async Assistant Service
+
+**Status:** Production-ready for scalability
+
+**Features:**
+- Separate service container
+- Async job processing
+- Keeps Streamlit UI responsive
+- Supports all provider types
+- In-memory job queue
+
+**Setup:**
+```bash
+# Mock mode
+REPOQUEST_AI_ENABLED=true \
+REPOQUEST_ASSISTANT_SERVICE_URL=http://assistant:8765 \
+REPOQUEST_ASSISTANT_SERVICE_PROVIDER=mock \
+docker compose --profile assistant up --build
+
+# Cloud mode
+REPOQUEST_AI_ENABLED=true \
+REPOQUEST_ASSISTANT_SERVICE_URL=http://assistant:8765 \
+CLAUDE_API_KEY=your_key_here \
+docker compose --profile assistant up --build
+
+# Local model mode
+REPOQUEST_AI_ENABLED=true \
+REPOQUEST_ASSISTANT_SERVICE_URL=http://assistant:8765 \
+REPOQUEST_ASSISTANT_SERVICE_PROVIDER=local \
+REPOQUEST_LOCAL_MODEL_BASE_URL=http://host.docker.internal:11434/v1 \
+REPOQUEST_LOCAL_MODEL_NAME=llama3.1 \
+docker compose --profile assistant up --build
+```
+
+**Environment:**
+```bash
+REPOQUEST_AI_ENABLED=true
+REPOQUEST_ASSISTANT_SERVICE_URL=http://assistant:8765
+REPOQUEST_ASSISTANT_SERVICE_TIMEOUT_SECONDS=45
+# Plus provider-specific variables
+```
+
+**Service endpoints:**
+- `GET /health` - Health check
+- `POST /jobs` - Submit assistant request
+- `GET /jobs/{job_id}` - Poll job status
+
+**Notes:**
+- Jobs stored in memory only
+- Restarting service clears pending jobs
+- Deterministic analysis unaffected by service status
 
 ## Configuration
 
@@ -28,6 +251,11 @@ CLAUDE_API_KEY=your_api_key_here
 
 # Claude model (optional, default: claude-sonnet-4-20250514)
 CLAUDE_MODEL=claude-sonnet-4-20250514
+
+# Optional async assistant service URL.
+# Use this when Streamlit should submit assistant jobs to a separate service.
+REPOQUEST_ASSISTANT_SERVICE_URL=
+REPOQUEST_ASSISTANT_SERVICE_TIMEOUT_SECONDS=45
 ```
 
 ### Streamlit Secrets (Cloud Deployment)
@@ -40,7 +268,46 @@ CLAUDE_API_KEY = "your_api_key_here"
 CLAUDE_MODEL = "claude-sonnet-4-20250514"
 ```
 
-If `REPOQUEST_AI_ENABLED=true` is set while no API key is available, RepoQuest keeps deterministic analysis enabled and shows a "no API key configured" assistant status.
+If `REPOQUEST_AI_ENABLED=true` is set while no API key or assistant service is available, RepoQuest keeps deterministic analysis enabled and shows a "no API key configured" assistant status.
+
+### Docker Compose Assistant Service
+
+RepoQuest can also run optional AI/model work in a separate service. This keeps
+the Streamlit UI process focused on deterministic analysis and makes assistant
+calls asynchronous at the service boundary.
+
+Deterministic app only:
+
+```bash
+docker compose up --build repoquest
+```
+
+App plus assistant service in mock mode:
+
+```bash
+REPOQUEST_AI_ENABLED=true \
+REPOQUEST_ASSISTANT_SERVICE_URL=http://assistant:8765 \
+REPOQUEST_ASSISTANT_SERVICE_PROVIDER=mock \
+docker compose --profile assistant up --build
+```
+
+App plus assistant service using Claude:
+
+```bash
+REPOQUEST_AI_ENABLED=true \
+REPOQUEST_ASSISTANT_SERVICE_URL=http://assistant:8765 \
+CLAUDE_API_KEY=your_api_key_here \
+docker compose --profile assistant up --build
+```
+
+The assistant service exposes:
+
+- `GET /health` for readiness checks.
+- `POST /jobs` to enqueue an assistant request.
+- `GET /jobs/{job_id}` to poll queued/running/completed status.
+
+The service stores jobs in memory only. Restarting the service clears pending
+assistant jobs, while deterministic RepoQuest analysis remains available.
 
 ## Features
 
@@ -128,6 +395,7 @@ class AssistantProvider(Protocol):
 - `DisabledAssistantProvider` - Returns "disabled"status
 - `MockAssistantProvider` - Returns deterministic test responses
 - `ClaudeAssistantProvider` - Calls Claude API via stdlib urllib
+- `AssistantServiceProvider` - Submits jobs to the optional async assistant service
 
 ### Context Builders
 
@@ -145,7 +413,8 @@ Each section has a dedicated context builder:
 ```
 User clicks AI button
  -> Context builder creates AssistantRequest
- -> Provider generates AssistantResponse
+ -> Provider generates AssistantResponse directly or submits a service job
+ -> Optional service queues/runs the model call asynchronously
  -> Validator checks response
  -> UI displays result or validation error
 ```
@@ -202,6 +471,16 @@ User clicks AI button
 1. Set `CLAUDE_API_KEY` in `.env` or Streamlit secrets
 2. Verify key is valid
 3. Restart the app
+
+### Assistant Service Unavailable
+
+**Symptom:** An AI button returns "Assistant service network error"
+
+**Solutions:**
+1. Confirm the service is running: `docker compose --profile assistant ps`
+2. Check that the app has `REPOQUEST_ASSISTANT_SERVICE_URL=http://assistant:8765`
+3. Try mock mode first with `REPOQUEST_ASSISTANT_SERVICE_PROVIDER=mock`
+4. Check `GET http://localhost:8765/health` from the host
 
 ### Validation Errors
 
@@ -268,6 +547,8 @@ provider = MockAssistantProvider(
 
 The Claude provider uses the Python standard library HTTP client. When available, it uses the local `certifi` certificate bundle to avoid common macOS certificate-chain errors. Network or certificate failures are displayed as assistant errors and do not interrupt deterministic RepoQuest output.
 
+In Docker assistant mode, the Claude call happens inside the `assistant` service. The Streamlit app receives only the assistant response/job status from the service, then still applies RepoQuest response validation before display.
+
 ### Data Retention
 
 - RepoQuest does not store AI responses permanently
@@ -283,7 +564,7 @@ Potential future features (not yet implemented):
 - Custom system prompts
 - Alternative LLM providers
 - Response caching
-- Batch processing
+- Persistent job storage beyond the current in-memory queue
 
 ## Support
 

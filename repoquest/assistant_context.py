@@ -5,12 +5,11 @@ from repoquest.models import (
   ProjectFingerprint,
   FileInfo,
   RouteInfo,
-  ReadingPathItem,
   ComponentCard,
   TestIntelligence,
   WorkPlan,
 )
-from repoquest.assistant_models import AssistantRequest
+from repoquest.assistant_models import AssistantRequest, ContextPack
 
 # Maximum snippet size to send to AI
 MAX_SNIPPET_CHARS = 800
@@ -293,6 +292,103 @@ def build_documentation_context(
     evidence_files=["README.md"] if readme else [],
     capped_snippets=snippets,
     max_tokens=1000,
+  )
+
+
+def build_context_pack(
+  snapshot: RepositorySnapshot,
+  fingerprint: ProjectFingerprint,
+  routes: list[RouteInfo] | None = None,
+  component_cards: list[ComponentCard] | None = None,
+  test_intelligence: TestIntelligence | None = None,
+  work_plan: WorkPlan | None = None,
+) -> ContextPack:
+  """Build a comprehensive bounded context pack for AI documentation generation."""
+  
+  # Project summary
+  project_summary = f"{fingerprint.project_type} (confidence: {fingerprint.confidence * 100:.0f}%)\n{fingerprint.summary}"
+  
+  # Frameworks
+  frameworks = [f"{fw.name} ({fw.category})" for fw in fingerprint.frameworks[:10]]
+  
+  # Entry points
+  entry_points = fingerprint.entry_points[:10]
+  
+  # Routes summary
+  routes_summary = ""
+  if routes:
+    route_groups: dict[str, list[str]] = {}
+    for route in routes[:20]:
+      key = route.framework or "unknown"
+      if key not in route_groups:
+        route_groups[key] = []
+      route_groups[key].append(f"{route.method} {route.path}")
+    
+    route_lines = []
+    for framework, route_list in route_groups.items():
+      route_lines.append(f"{framework}: {len(route_list)} routes")
+      for r in route_list[:5]:
+        route_lines.append(f"  - {r}")
+    routes_summary = "\n".join(route_lines)
+  
+  # Component summary
+  component_summary = ""
+  if component_cards:
+    role_counts: dict[str, int] = {}
+    for card in component_cards:
+      role_counts[card.role] = role_counts.get(card.role, 0) + 1
+    component_summary = "\n".join([f"{role}: {count}" for role, count in role_counts.items()])
+  
+  # Test summary
+  test_summary = ""
+  if test_intelligence:
+    test_summary = f"Test files: {len(test_intelligence.test_insights)}\n"
+    test_summary += f"Missing coverage: {len(test_intelligence.missing_coverage)} items"
+  
+  # Workflow summary
+  workflow_summary = ""
+  if work_plan:
+    workflow_summary = f"Epics: {len(work_plan.epics)}\n"
+    workflow_summary += f"Tasks: {len(work_plan.tasks)}\n"
+    workflow_summary += f"Workflows: {len(work_plan.workflows)}"
+  
+  # Evidence snippets - collect from key files only
+  evidence_snippets: dict[str, str] = {}
+  
+  # Add entry point snippets
+  for ep in entry_points[:3]:
+    file_info = next((f for f in snapshot.files if f.path == ep), None)
+    if file_info and _is_safe_file(file_info) and file_info.text_preview:
+      evidence_snippets[ep] = _cap_snippet(file_info.text_preview, max_chars=600)
+  
+  # Add route file snippets
+  if routes:
+    route_files = list(set([r.file_path for r in routes[:5]]))
+    for route_file in route_files[:2]:
+      if route_file not in evidence_snippets:
+        file_info = next((f for f in snapshot.files if f.path == route_file), None)
+        if file_info and _is_safe_file(file_info) and file_info.text_preview:
+          evidence_snippets[route_file] = _cap_snippet(file_info.text_preview, max_chars=600)
+  
+  # Collect warnings
+  warnings = list(snapshot.warnings[:10])
+  
+  # Add skipped file warnings
+  skipped_count = sum(1 for f in snapshot.files if f.skipped)
+  if skipped_count > 0:
+    warnings.append(f"{skipped_count} files were skipped (binary, too large, or ignored)")
+  
+  return ContextPack(
+    project_summary=project_summary,
+    frameworks=frameworks,
+    entry_points=entry_points,
+    routes_summary=routes_summary,
+    component_summary=component_summary,
+    test_summary=test_summary,
+    workflow_summary=workflow_summary,
+    evidence_snippets=evidence_snippets,
+    warnings=warnings,
+    total_files_scanned=snapshot.total_files_scanned,
   )
 
 # Made with Bob

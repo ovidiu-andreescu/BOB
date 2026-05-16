@@ -15,6 +15,8 @@ def test_component_cards_generated():
   routes = extract_all_routes(snapshot.files)
 
   cards = generate_component_cards(snapshot, fingerprint, routes)
+  assert cards
+  assert cards
 
   assert len(cards) > 0
 
@@ -165,6 +167,7 @@ def test_component_cards_have_required_fields():
   routes = extract_all_routes(snapshot.files)
 
   cards = generate_component_cards(snapshot, fingerprint, routes)
+  assert cards
 
 
 def test_component_cards_exclude_init_py():

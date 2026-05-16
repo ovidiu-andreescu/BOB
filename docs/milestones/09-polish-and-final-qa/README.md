@@ -36,7 +36,7 @@ python scripts/run_local.py
 - Tests tab with a repo that has no tests.
 - Documentation preview with README/docs present.
 - Documentation preview with no README/docs present.
-- Analysis workspace after the sidebar/input controls are hidden.
+- Analysis workspace with persistent sidebar/input controls available after generation.
 - Architecture graph in application mode, tests mode, and all-debug mode.
 - Optional AI disabled, enabled without key, and enabled with network/provider error.
 

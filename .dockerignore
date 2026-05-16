@@ -1,0 +1,11 @@
+.git
+.venv
+__pycache__
+.pytest_cache
+.ruff_cache
+.mypy_cache
+.streamlit/secrets.toml
+.env
+bob_sessions/*.json
+bob_sessions/*.md
+examples/demo_repos/**/node_modules
