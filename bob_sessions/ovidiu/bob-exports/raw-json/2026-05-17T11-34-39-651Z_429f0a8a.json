@@ -1,0 +1,14 @@
+{
+  "sessionId": "429f0a8a-35a6-4225-8a45-911dfdc5bad9",
+  "projectHash": "996230cb7114b35cfd64f8a09c8c844df462fb6fccb537fc40e66846b7ba2a2b",
+  "startTime": "2026-05-17T11:34:39.651Z",
+  "lastUpdated": "2026-05-17T11:34:39.651Z",
+  "messages": [
+    {
+      "id": "646756a9-dbae-48a9-a98d-350253bb04ba",
+      "timestamp": "2026-05-17T11:34:39.651Z",
+      "type": "user",
+      "content": "export ./bob-exports/"
+    }
+  ]
+}
