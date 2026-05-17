@@ -5,7 +5,7 @@ PYTHON ?= $(VENV_PYTHON)
 PIP := $(PYTHON) -m pip
 APP := app/streamlit_app.py
 LOCAL_MODEL_BASE_URL ?= http://localhost:11434/v1
-LOCAL_MODEL_NAME ?= llama3.1
+LOCAL_MODEL_NAME ?= gemma3:4b
 ASSISTANT_SERVICE_URL ?= http://localhost:8765
 
 .PHONY: help python-info venv install install-dev upgrade-pip run run-direct run-ai-mock run-ai-local run-ai-claude run-ai-service assistant-service assistant-service-mock assistant-service-local test lint lint-fix qa sync-cloud-config check-cloud-config clean demo-path docker-run docker-run-assistant docker-run-local docker-run-claude

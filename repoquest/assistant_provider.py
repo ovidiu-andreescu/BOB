@@ -3,6 +3,7 @@
 import json
 import os
 import ssl
+import sys
 import time
 import urllib.request
 import urllib.error
@@ -38,10 +39,15 @@ LOCAL_MODEL_404_MESSAGE = (
 
 def _load_local_env(env_path: str = ".env") -> None:
   """Load simple KEY=value pairs from local.env files without extra dependencies."""
-  candidates = [
-    Path(env_path),
-    Path(__file__).resolve().parents[1] / env_path,
-  ]
+  repo_env = Path(__file__).resolve().parents[1] / env_path
+  cwd_env = Path(env_path)
+  running_pytest = "pytest" in sys.modules or "PYTEST_CURRENT_TEST" in os.environ
+
+  candidates = []
+  if not (running_pytest and cwd_env.resolve() == repo_env.resolve()):
+    candidates.append(cwd_env)
+  if not running_pytest:
+    candidates.append(repo_env)
 
   path = next((candidate for candidate in candidates if candidate.exists()), None)
   if path is None:
@@ -233,6 +239,10 @@ class MockAssistantProvider:
 
   def generate(self, request: AssistantRequest) -> AssistantResponse:
     """Return a mock response."""
+    if request.section_id == "ai_fusion":
+      from repoquest.ai_fusion import generate_mock_fusion_response
+      return generate_mock_fusion_response(request)
+
     return AssistantResponse(
       status="ok",
       response_text=self.mock_response,

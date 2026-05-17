@@ -2,7 +2,7 @@
 
 **Turn unfamiliar repos into guided onboarding journeys**
 
-RepoQuest helps developers onboard to small codebases faster by converting repository structure into a guided quest: project fingerprint, application graph, reading workbench, component cards, test intelligence, work plans, quiz, exportable docs, and optional AI-assisted follow-up actions.
+RepoQuest helps developers onboard to small codebases faster by converting repository structure into a guided quest: project fingerprint, application graph, reading workbench, component cards, test intelligence, work plans, quiz, exportable docs, and optional AI-first hybrid analysis.
 
 ## What is RepoQuest?
 
@@ -15,6 +15,7 @@ RepoQuest is a deterministic repository onboarding mapper for small prototype-si
 - **Test Intelligence** - Maps tests to likely targets and suggests missing coverage
 - **Work Plans** - Generates deterministic epics, tasks, and milestones
 - **Agent Workflows** - Generates step-by-step workflows for IBM Bob or another coding assistant
+- **AI Fusion Analyzer** - When configured, audits deterministic findings and can override interpretation-level conclusions with cited evidence
 - **Onboarding Quiz** - Verifies understanding with interactive questions
 - **Markdown Export** - Generates comprehensive onboarding documentation
 
@@ -23,9 +24,9 @@ RepoQuest is a deterministic repository onboarding mapper for small prototype-si
 Developers waste time figuring out where to start in unfamiliar codebases. RepoQuest solves this by:
 
 - **Fast Analysis** - Scans and analyzes repositories in seconds
-- **Deterministic Core** - Uses static analysis and rule evaluators; optional AI actions are disabled by default
+- **Deterministic Evidence Core** - Uses static analysis and rule evaluators; optional AI Fusion is disabled by default
 - **Safe** - Validates ZIP uploads, never executes uploaded code
-- **Actionable** - Provides specific next steps and optional AI Assistant actions
+- **Actionable** - Provides specific next steps, AI Fusion notes when configured, and assistant-ready actions
 - **Exportable** - Generates standalone Markdown guides for team onboarding
 
 ## Features
@@ -45,7 +46,7 @@ Developers waste time figuring out where to start in unfamiliar codebases. RepoQ
 - Deterministic epics, tasks, milestones, and follow-up workflows
 - Interactive quiz for knowledge verification
 - Documentation and config file previews
-- Optional AI Assistant actions for deeper exploration
+- Optional AI Fusion for project interpretation, architecture notes, reading notes, and recommendations
 
 ### Security
 - ZIP slip protection
@@ -322,10 +323,11 @@ repoquest/
 
 **Optional Assistant Mode:**
 - Disabled by default
-- Manual button clicks only
+- Runs AI Fusion automatically after deterministic analysis when configured, then keeps manual AI review buttons available
 - Uses bounded context packs, capped snippets, citations, and validation
 - Requires `REPOQUEST_AI_ENABLED=true` and a user-provided Claude API key
 - Can run model work through a separate async Docker service via `REPOQUEST_ASSISTANT_SERVICE_URL`
+- May send capped repository snippets to the configured provider; deterministic mode sends no snippets and makes no AI calls
 
 ## Limitations
 
@@ -362,7 +364,7 @@ RepoQuest was built with IBM Bob as a development partner. Bob helped with:
 - Comprehensive test generation
 - Documentation and deployment setup
 
-**Important:** RepoQuest does not use IBM Bob at runtime. Core repository analysis is deterministic and based on static file scanning, rule evaluation, pattern matching, and heuristics. Optional AI Assistant actions are disabled by default, manual-only, and separate from the deterministic output.
+**Important:** RepoQuest does not use IBM Bob at runtime. Core repository evidence is deterministic and based on static file scanning, rule evaluation, pattern matching, and heuristics. When optional AI is configured, AI Fusion can reinterpret that evidence and override displayed conclusions only after citation and validation gates pass.
 
 See [docs/bob_usage.md](docs/bob_usage.md) for details on how Bob helped during development.
 

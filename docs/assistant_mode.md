@@ -2,15 +2,35 @@
 
 ## Overview
 
-RepoQuest includes an **optional AI assistant** that can provide additional insights beyond deterministic static analysis.
+RepoQuest includes an **optional AI-first hybrid analyzer** that can provide additional insights beyond deterministic static analysis.
+
+When AI is configured, RepoQuest runs deterministic analysis first, then runs **AI Fusion**. AI Fusion audits the project classification, architecture interpretation, reading path notes, component notes, risks, and recommendations using bounded context from the deterministic analyzer.
 
 **Important:** The AI assistant is:
 - **Disabled by default**
 - **Optional** - all core RepoQuest features work without it
-- **Manual-only** - never runs automatically
+- **AI-first when configured** - AI Fusion runs automatically after deterministic analysis
 - **Bounded** - only receives capped context packs, not entire repos
 - **Safe** - validates responses to prevent execution claims
 - **Multiple providers** - supports Claude, local models, and mock mode
+
+AI Fusion may send capped snippets and structured repository summaries to the configured provider. Deterministic mode sends no snippets and makes no AI/model calls.
+
+## AI Fusion Trust Model
+
+The deterministic analyzer remains the evidence source. AI Fusion can override only interpretation-level outputs:
+
+- project type
+- framework labels/confidence notes
+- entry point ranking
+- architecture summary
+- reading path notes
+- component notes
+- improvement risks and recommendations
+
+AI Fusion cannot delete or rewrite deterministic facts such as scanned files, extracted routes, import edges, ZIP safety warnings, skipped files, or upload limits.
+
+Every override must cite existing scanned file paths. Project-type overrides require confidence of at least `0.75` and at least two evidence paths. If deterministic confidence is already high, AI confidence must exceed it by `0.10`; otherwise the AI output is shown as a disagreement rather than an override.
 
 ## Deployment Profiles
 
