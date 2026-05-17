@@ -84,33 +84,33 @@ def get_deployment_profile() -> str:
     - "local_model" - AI enabled with local model provider
     - "service_assistant" - AI enabled via async assistant service
     """
-    import os
-    
-    # Check if AI is enabled
-    ai_enabled = os.getenv("REPOQUEST_AI_ENABLED", "false").strip().lower() in {"true", "1", "yes", "on"}
+    from repoquest.assistant_provider import (
+        get_assistant_config,
+        get_assistant_service_config,
+        get_config_value,
+    )
+
+    ai_enabled, provider, api_key, _model, _local_base_url, _local_model_name = get_assistant_config()
     
     if not ai_enabled:
         return "deterministic"
     
     # Check for assistant service URL
-    service_url = os.getenv("REPOQUEST_ASSISTANT_SERVICE_URL", "").strip()
+    service_url, _service_timeout = get_assistant_service_config()
     if service_url:
         # Service mode - check service provider
-        service_provider = os.getenv("REPOQUEST_ASSISTANT_SERVICE_PROVIDER", "").strip().lower()
+        service_provider = get_config_value("REPOQUEST_ASSISTANT_SERVICE_PROVIDER").lower()
         if service_provider == "mock":
             return "mock_assistant"
         return "service_assistant"
     
     # Direct provider mode
-    provider = os.getenv("REPOQUEST_ASSISTANT_PROVIDER", "").strip().lower()
-    
     if provider == "mock":
         return "mock_assistant"
     elif provider == "local":
         return "local_model"
     elif provider in {"claude", ""}:
         # Default to cloud if API key is present
-        api_key = os.getenv("CLAUDE_API_KEY", "").strip()
         if api_key:
             return "cloud_assistant"
         return "deterministic"

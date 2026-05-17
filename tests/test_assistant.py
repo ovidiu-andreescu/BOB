@@ -182,6 +182,36 @@ def test_assistant_config_loads_local_env(tmp_path, monkeypatch):
   assert model == "test-model"
 
 
+def test_assistant_config_reads_streamlit_secrets(monkeypatch):
+  """Test assistant config falls back to Streamlit secrets for cloud deployment."""
+  import sys
+  from types import SimpleNamespace
+
+  monkeypatch.delenv("REPOQUEST_AI_ENABLED", raising=False)
+  monkeypatch.delenv("CLAUDE_API_KEY", raising=False)
+  monkeypatch.delenv("CLAUDE_MODEL", raising=False)
+  monkeypatch.setitem(
+    sys.modules,
+    "streamlit",
+    SimpleNamespace(
+      secrets={
+        "REPOQUEST_AI_ENABLED": "true",
+        "CLAUDE_API_KEY": "test-secret-key",
+        "CLAUDE_MODEL": "test-secret-model",
+      }
+    ),
+  )
+
+  enabled, provider, api_key, model, local_base_url, local_model_name = get_assistant_config()
+
+  assert enabled is True
+  assert provider == "claude"
+  assert api_key == "test-secret-key"
+  assert model == "test-secret-model"
+  assert local_base_url == ""
+  assert local_model_name == ""
+
+
 def test_assistant_provider_uses_local_env(tmp_path, monkeypatch):
   """Test local.env enables the real provider path when a key is present."""
   monkeypatch.chdir(tmp_path)

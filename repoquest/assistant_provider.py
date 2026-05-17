@@ -86,59 +86,45 @@ def _is_truthy(value: object | None) -> bool:
   return str(value).strip().lower() in {"1", "true", "yes", "on"}
 
 
-def get_assistant_config() -> tuple[bool, str, str, str, str, str]:
-  """Return assistant enabled flag, provider type, Claude API key, Claude model, local base URL, and local model name."""
+def get_config_value(name: str, default: str = "") -> str:
+  """Read a config value from local/env first, then Streamlit secrets."""
   _load_local_env()
 
-  enabled_value = os.getenv("REPOQUEST_AI_ENABLED")
-  if enabled_value is None:
-    enabled_value = _streamlit_secret("REPOQUEST_AI_ENABLED")
+  value = os.getenv(name)
+  if value is not None and str(value).strip():
+    return str(value).strip()
 
-  provider = os.getenv("REPOQUEST_ASSISTANT_PROVIDER", "").strip().lower()
-  if not provider:
-    secret_provider = _streamlit_secret("REPOQUEST_ASSISTANT_PROVIDER")
-    provider = str(secret_provider or "").strip().lower()
+  secret_value = _streamlit_secret(name)
+  if secret_value is not None:
+    return str(secret_value).strip()
+
+  return default
+
+
+def get_assistant_config() -> tuple[bool, str, str, str, str, str]:
+  """Return assistant enabled flag, provider type, Claude API key, Claude model, local base URL, and local model name."""
+  enabled_value = get_config_value("REPOQUEST_AI_ENABLED")
+
+  provider = get_config_value("REPOQUEST_ASSISTANT_PROVIDER").lower()
   if not provider:
     provider = "claude"
 
-  api_key = os.getenv("CLAUDE_API_KEY", "").strip()
-  if not api_key:
-    secret_key = _streamlit_secret("CLAUDE_API_KEY")
-    api_key = str(secret_key or "").strip()
+  api_key = get_config_value("CLAUDE_API_KEY")
 
-  model = os.getenv("CLAUDE_MODEL", "").strip()
-  if not model:
-    secret_model = _streamlit_secret("CLAUDE_MODEL")
-    model = str(secret_model or "").strip()
+  model = get_config_value("CLAUDE_MODEL")
   if not model:
     model = DEFAULT_CLAUDE_MODEL
 
-  local_base_url = os.getenv("REPOQUEST_LOCAL_MODEL_BASE_URL", "").strip()
-  if not local_base_url:
-    secret_url = _streamlit_secret("REPOQUEST_LOCAL_MODEL_BASE_URL")
-    local_base_url = str(secret_url or "").strip()
-
-  local_model_name = os.getenv("REPOQUEST_LOCAL_MODEL_NAME", "").strip()
-  if not local_model_name:
-    secret_name = _streamlit_secret("REPOQUEST_LOCAL_MODEL_NAME")
-    local_model_name = str(secret_name or "").strip()
+  local_base_url = get_config_value("REPOQUEST_LOCAL_MODEL_BASE_URL")
+  local_model_name = get_config_value("REPOQUEST_LOCAL_MODEL_NAME")
 
   return _is_truthy(enabled_value), provider, api_key, model, local_base_url, local_model_name
 
 
 def get_assistant_service_config() -> tuple[str, float]:
   """Return optional assistant service URL and timeout."""
-  _load_local_env()
-
-  service_url = os.getenv("REPOQUEST_ASSISTANT_SERVICE_URL", "").strip()
-  if not service_url:
-    secret_url = _streamlit_secret("REPOQUEST_ASSISTANT_SERVICE_URL")
-    service_url = str(secret_url or "").strip()
-
-  timeout_value = os.getenv("REPOQUEST_ASSISTANT_SERVICE_TIMEOUT_SECONDS", "").strip()
-  if not timeout_value:
-    secret_timeout = _streamlit_secret("REPOQUEST_ASSISTANT_SERVICE_TIMEOUT_SECONDS")
-    timeout_value = str(secret_timeout or "").strip()
+  service_url = get_config_value("REPOQUEST_ASSISTANT_SERVICE_URL")
+  timeout_value = get_config_value("REPOQUEST_ASSISTANT_SERVICE_TIMEOUT_SECONDS")
 
   try:
     timeout_seconds = float(timeout_value) if timeout_value else DEFAULT_SERVICE_TIMEOUT_SECONDS

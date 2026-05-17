@@ -1,6 +1,8 @@
 """Tests for deployment profile detection."""
 
 import os
+import sys
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from repoquest.config import get_deployment_profile, get_profile_description
@@ -57,6 +59,21 @@ class TestDeploymentProfileDetection:
                 "CLAUDE_API_KEY": "sk-ant-test-key",
             },
             clear=True,
+        ):
+            profile = get_deployment_profile()
+            assert profile == "cloud_assistant"
+
+    def test_cloud_assistant_with_streamlit_secrets(self):
+        """Test cloud assistant profile with Streamlit Cloud secrets."""
+        secrets = SimpleNamespace(
+            secrets={
+                "REPOQUEST_AI_ENABLED": "true",
+                "CLAUDE_API_KEY": "sk-ant-test-key",
+            }
+        )
+        with (
+            patch.dict(os.environ, {}, clear=True),
+            patch.dict(sys.modules, {"streamlit": secrets}),
         ):
             profile = get_deployment_profile()
             assert profile == "cloud_assistant"
