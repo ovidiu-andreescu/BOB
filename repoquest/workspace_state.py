@@ -23,7 +23,7 @@ from repoquest.models import (
     WorkPlan,
     TestIntelligence,
 )
-from repoquest.assistant_models import AssistantRunResult
+from repoquest.assistant_models import AssistantRunResult, FusedAnalysisResult
 
 
 @dataclass
@@ -85,6 +85,7 @@ class WorkspaceState:
     
     # Assistant outputs (tied to source_id)
     assistant_outputs: dict[str, AssistantRunResult] = field(default_factory=dict)
+    fused_analysis: FusedAnalysisResult | None = None
     
     def is_stale(self, new_source_metadata: SourceMetadata) -> bool:
         """Check if current state is stale compared to new source."""
@@ -113,6 +114,7 @@ class WorkspaceState:
         self.quiz_submitted = False
         self.quiz_current_question = 0
         self.assistant_outputs = {}
+        self.fused_analysis = None
     
     def clear_all(self) -> None:
         """Clear everything including source metadata."""
@@ -156,6 +158,7 @@ class WorkspaceState:
             "quiz_submitted": self.quiz_submitted,
             "quiz_current_question": self.quiz_current_question,
             "assistant_outputs": self.assistant_outputs,
+            "fused_analysis": self.fused_analysis,
             # Legacy compatibility
             "source_type": self.source_metadata.source_type if self.source_metadata else None,
         }
@@ -182,6 +185,7 @@ class WorkspaceState:
             quiz_submitted=session_state.get("quiz_submitted", False),
             quiz_current_question=session_state.get("quiz_current_question", 0),
             assistant_outputs=session_state.get("assistant_outputs", {}),
+            fused_analysis=session_state.get("fused_analysis"),
         )
 
 
@@ -226,6 +230,7 @@ def get_workspace_export_metadata(workspace: WorkspaceState) -> dict[str, Any]:
         "file_count": workspace.source_metadata.file_count,
         "has_ai_outputs": len(workspace.assistant_outputs) > 0,
         "ai_output_count": len(workspace.assistant_outputs),
+        "has_ai_fusion": workspace.fused_analysis is not None,
     }
 
 

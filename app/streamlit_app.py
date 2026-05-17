@@ -60,11 +60,13 @@ from repoquest.assistant_state import (
   format_ai_status_for_sidebar,
   format_ai_status_for_tab,
 )
+from repoquest.ai_fusion import run_ai_fusion
 from repoquest.indicator_rules import split_evidence
 from repoquest.workspace_state import (
   WorkspaceState,
   detect_source_change,
 )
+from repoquest.models import ProjectFingerprint
 
 
 def get_workspace() -> WorkspaceState:
@@ -80,6 +82,29 @@ def save_workspace(workspace: WorkspaceState) -> None:
   # Also update individual keys for backward compatibility
   for key, value in workspace.to_dict().items():
     st.session_state[key] = value
+
+
+def build_display_fingerprint(
+    fingerprint: ProjectFingerprint,
+    fused_analysis,
+) -> ProjectFingerprint:
+  """Return the fingerprint that should be shown/exported for this workspace."""
+  if not fused_analysis:
+    return fingerprint
+
+  warnings = list(fingerprint.warnings)
+  if fused_analysis.report and fused_analysis.report.warnings:
+    warnings.extend(f"AI Fusion: {warning}" for warning in fused_analysis.report.warnings)
+
+  return ProjectFingerprint(
+    project_type=fused_analysis.final_project_type,
+    confidence=fused_analysis.final_confidence,
+    frameworks=fingerprint.frameworks,
+    entry_points=fused_analysis.final_entry_points,
+    key_folders=fingerprint.key_folders,
+    summary=fused_analysis.final_summary,
+    warnings=warnings,
+  )
 
 
 def reset_analysis():
@@ -1479,6 +1504,30 @@ def main():
             workspace.test_intelligence = test_intelligence
             st.session_state["test_intelligence"] = test_intelligence
 
+          # Run AI Fusion automatically when a configured provider is ready.
+          ai_status = get_ai_status()
+          workspace.fused_analysis = None
+          st.session_state.pop("fused_analysis", None)
+          if ai_status.is_ready:
+            with st.spinner("Running AI Fusion analyzer..."):
+              try:
+                fused_analysis = run_ai_fusion(
+                  provider=get_assistant_provider(),
+                  snapshot=snapshot,
+                  fingerprint=fingerprint,
+                  routes=routes,
+                  import_edges=edges,
+                  reading_path=reading_path,
+                  component_cards=component_cards,
+                  work_plan=work_plan,
+                  test_intelligence=test_intelligence,
+                  source_id=new_metadata.source_id,
+                )
+                workspace.fused_analysis = fused_analysis
+                st.session_state["fused_analysis"] = fused_analysis
+              except Exception as fusion_error:
+                st.warning(f"AI Fusion was unavailable: {fusion_error}")
+
           # Save workspace
           save_workspace(workspace)
 
@@ -1514,7 +1563,29 @@ def main():
   if workspace.has_analysis():
     snapshot = workspace.snapshot
     fingerprint = workspace.fingerprint
+    fused_analysis = workspace.fused_analysis
     source_type = workspace.source_metadata.source_type if workspace.source_metadata else "unknown"
+    final_project_type = (
+      fused_analysis.final_project_type
+      if fused_analysis
+      else fingerprint.project_type
+    )
+    final_confidence = (
+      fused_analysis.final_confidence
+      if fused_analysis
+      else fingerprint.confidence
+    )
+    final_summary = (
+      fused_analysis.final_summary
+      if fused_analysis
+      else fingerprint.summary
+    )
+    final_entry_points = (
+      fused_analysis.final_entry_points
+      if fused_analysis
+      else fingerprint.entry_points
+    )
+    display_fingerprint = build_display_fingerprint(fingerprint, fused_analysis)
 
     # Source info with refresh capability
     st.info(f"📊 **Current Analysis:** {workspace.source_metadata.source_name if workspace.source_metadata else 'Unknown'} ({source_type})")
@@ -1542,7 +1613,7 @@ def main():
       "Components",
       "Work Plans",
       "Agent Workflows",
-      "AI Recommendations",
+      "AI Analyzer",
       "Improve",
       "Export",
     ])
@@ -1575,14 +1646,14 @@ def main():
         reading_path = st.session_state.get("reading_path", [])
         next_read = reading_path[0].path if reading_path else "No reading path generated"
         framework_names = ", ".join(f.name for f in fingerprint.frameworks[:3]) or "No confident framework"
-        entry_preview = fingerprint.entry_points[0] if fingerprint.entry_points else "No entry point detected"
+        entry_preview = final_entry_points[0] if final_entry_points else "No entry point detected"
 
         render_mini_label("Focus Board", "overview", "blue")
         focus_col1, focus_col2, focus_col3, focus_col4 = st.columns(4)
         with focus_col1:
-          st.metric("Project", fingerprint.project_type)
+          st.metric("Project", final_project_type)
         with focus_col2:
-          st.metric("Confidence", f"{fingerprint.confidence * 100:.0f}%")
+          st.metric("Confidence", f"{final_confidence * 100:.0f}%")
         with focus_col3:
           st.metric("Frameworks", len(fingerprint.frameworks))
           st.caption(framework_names)
@@ -1611,11 +1682,43 @@ def main():
         # Project type and confidence
         col1, col2 = st.columns([2, 1])
         with col1:
+          render_mini_label("Analyzer Mode", "assistant", "purple")
+          if fused_analysis and fused_analysis.is_ai_enhanced:
+            st.markdown("**AI-first hybrid**")
+            st.caption(f"Final answer: {fused_analysis.mode.replace('-', ' ')}")
+          else:
+            st.markdown("**Deterministic**")
+            st.caption("AI Fusion is not active for this workspace.")
+
           render_mini_label("Project Type", "overview", "blue")
-          st.markdown(f"**{fingerprint.project_type}**")
-          st.markdown(fingerprint.summary)
+          st.markdown(f"**{final_project_type}**")
+          st.markdown(final_summary)
         with col2:
-          st.metric("Confidence", f"{fingerprint.confidence * 100:.0f}%")
+          st.metric("Confidence", f"{final_confidence * 100:.0f}%")
+
+        if fused_analysis and fused_analysis.report:
+          report = fused_analysis.report
+          with st.expander("Why AI changed or confirmed this", expanded=bool(fused_analysis.applied_overrides)):
+            st.markdown(report.summary or "AI Fusion completed without a summary.")
+            if fused_analysis.applied_overrides:
+              override_rows = [
+                {
+                  "Target": override.target,
+                  "Original": str(override.original_value),
+                  "AI Proposal": str(override.proposed_value),
+                  "Confidence": f"{override.confidence:.0%}",
+                  "Why": override.rationale,
+                }
+                for override in fused_analysis.applied_overrides
+              ]
+              st.dataframe(pd.DataFrame(override_rows), use_container_width=True, hide_index=True)
+            if report.warnings:
+              for warning in report.warnings:
+                st.warning(warning)
+            st.markdown("**Deterministic audit trail**")
+            st.markdown(f"Original project type: `{fingerprint.project_type}`")
+            st.markdown(f"Original confidence: `{fingerprint.confidence:.0%}`")
+            st.markdown(fingerprint.summary)
 
         # Frameworks
         if fingerprint.frameworks:
@@ -1638,12 +1741,12 @@ def main():
                 st.dataframe(evidence_df, use_container_width=True, hide_index=True)
 
         # Entry points
-        if fingerprint.entry_points:
+        if final_entry_points:
           render_mini_label("Entry Points", "route", "green")
 
           # Build entry points table with type and reason
           entry_data = []
-          for entry_point in fingerprint.entry_points:
+          for entry_point in final_entry_points:
             # Determine type and reason based on path
             file_info = next((f for f in snapshot.files if f.path == entry_point), None)
 
@@ -1742,7 +1845,7 @@ def main():
       render_mini_label("AI Review", "assistant", "purple")
 
       ai_status = get_ai_status()
-      if ai_status == "ready" and fingerprint:
+      if ai_status.is_ready and fingerprint:
         st.caption("Adds an evidence-cited review on top of the deterministic overview.")
         if st.button("Generate Overview Review", key="ai_overview"):
           def build_request():
@@ -1783,6 +1886,12 @@ def main():
       ]
       with st.expander("Layer definitions", expanded=False):
         st.dataframe(pd.DataFrame(layer_rows), use_container_width=True, hide_index=True)
+
+      if fused_analysis and fused_analysis.report and fused_analysis.report.architecture_summary:
+        render_mini_label("AI Fusion Architecture Summary", "assistant", "purple")
+        st.info(fused_analysis.report.architecture_summary)
+        with st.expander("Architecture audit trail", expanded=False):
+          st.caption("The graphs below remain generated from deterministic routes, imports, and file roles.")
 
       if "import_edges" in st.session_state and "snapshot" in st.session_state:
         edges = st.session_state["import_edges"]
@@ -2189,6 +2298,15 @@ def main():
 
             render_mini_label("Why read this", "reading", "green")
             st.markdown(item.reason)
+            if (
+                fused_analysis
+                and fused_analysis.report
+                and item.path in fused_analysis.report.reading_path_notes
+            ):
+              render_mini_label("AI Fusion Note", "assistant", "purple")
+              st.info(fused_analysis.report.reading_path_notes[item.path])
+              with st.expander("Reading path audit trail", expanded=False):
+                st.markdown(f"Deterministic reason: {item.reason}")
 
             if file_info.text_preview and not file_info.skipped:
               render_mini_label("Read", "file", tone_for_role(file_info.role))
@@ -2287,6 +2405,15 @@ def main():
               card.why_it_matters,
               tone_for_role(card.role),
             )
+            if (
+                fused_analysis
+                and fused_analysis.report
+                and card.path in fused_analysis.report.component_notes
+            ):
+              render_mini_label("AI Fusion Note", "assistant", "purple")
+              st.info(fused_analysis.report.component_notes[card.path])
+              with st.expander("Component audit trail", expanded=False):
+                st.markdown(f"Deterministic note: {card.why_it_matters}")
 
             if card.detected_items:
               render_mini_label("Detected Evidence", "shield", "blue")
@@ -2544,6 +2671,25 @@ def main():
         with col3:
           st.metric("Milestones", len(work_plan.milestones))
 
+        if fused_analysis and fused_analysis.report:
+          report = fused_analysis.report
+          if report.risks or report.recommendations:
+            render_mini_label("AI Fusion Priorities", "assistant", "purple")
+            if report.risks:
+              st.dataframe(
+                pd.DataFrame({"Risk": report.risks}),
+                use_container_width=True,
+                hide_index=True,
+              )
+            if report.recommendations:
+              st.dataframe(
+                pd.DataFrame({"Recommendation": report.recommendations}),
+                use_container_width=True,
+                hide_index=True,
+              )
+            with st.expander("Work plan audit trail", expanded=False):
+              st.caption("The task list below is generated from deterministic RepoQuest evidence.")
+
         st.markdown("---")
 
         # Suggested Milestones
@@ -2718,17 +2864,63 @@ def main():
       else:
         st.info("Generate an onboarding quest to see agent workflows.")
 
-    # AI Recommendations Tab
+    # AI Analyzer Tab
     with recommendations_tab:
       render_section_header(
-        "AI Code Recommendations",
-        "AI-generated actionable recommendations grounded in repository evidence.",
+        "AI Analyzer",
+        "AI Fusion output, trust gates, and code recommendations grounded in repository evidence.",
         "assistant",
         "purple",
       )
 
       ai_status = get_ai_status()
-      
+
+      if fused_analysis and fused_analysis.report:
+        report = fused_analysis.report
+        render_mini_label("AI Fusion Result", "assistant", "purple")
+        col1, col2, col3 = st.columns(3)
+        with col1:
+          st.metric("Mode", fused_analysis.mode.replace("-", " ").title())
+        with col2:
+          st.metric("Validation", report.validation_status.title())
+        with col3:
+          st.metric("Applied Overrides", len(fused_analysis.applied_overrides))
+
+        st.markdown(report.summary or fused_analysis.final_summary)
+
+        if report.claims:
+          claims_df = pd.DataFrame([
+            {
+              "Claim": claim.claim_type,
+              "Value": claim.value,
+              "Confidence": f"{claim.confidence:.0%}",
+              "Evidence": ", ".join(claim.evidence[:3]),
+            }
+            for claim in report.claims
+          ])
+          st.dataframe(claims_df, use_container_width=True, hide_index=True)
+
+        if report.overrides:
+          with st.expander("Override validation details", expanded=bool(fused_analysis.applied_overrides)):
+            override_df = pd.DataFrame([
+              {
+                "Target": override.target,
+                "Status": override.status,
+                "Confidence": f"{override.confidence:.0%}",
+                "Evidence": ", ".join(override.evidence[:3]),
+                "Warnings": "; ".join(override.warnings),
+              }
+              for override in report.overrides
+            ])
+            st.dataframe(override_df, use_container_width=True, hide_index=True)
+
+        if report.warnings:
+          with st.expander("Fusion warnings", expanded=False):
+            for warning in report.warnings:
+              st.warning(warning)
+      else:
+        st.info("AI Fusion has not run for this workspace. Deterministic analysis remains available.")
+
       if not ai_status.is_ready:
         st.info("AI Assistant is disabled. Enable it to generate code recommendations.")
         tab_caption = format_ai_status_for_tab(ai_status)
@@ -2746,7 +2938,12 @@ def main():
             with st.spinner("Generating AI recommendations..."):
               # Build context pack
               context_pack = build_context_pack(
-                snapshot, fingerprint, routes, component_cards, work_plan
+                snapshot=snapshot,
+                fingerprint=fingerprint,
+                routes=routes,
+                component_cards=component_cards,
+                test_intelligence=st.session_state.get("test_intelligence"),
+                work_plan=work_plan,
               )
               
               # Get provider and generate recommendations
@@ -3142,7 +3339,7 @@ IMPORTANT: Do not execute uploaded code. Only analyze and generate improvements.
           with st.spinner("Generating documentation..."):
             markdown_content = generate_markdown_report(
               snapshot=st.session_state["snapshot"],
-              fingerprint=st.session_state["fingerprint"],
+              fingerprint=display_fingerprint,
               routes=st.session_state.get("routes", []),
               reading_path=st.session_state.get("reading_path", []),
               component_cards=st.session_state.get("component_cards", []),
@@ -3171,7 +3368,7 @@ IMPORTANT: Do not execute uploaded code. Only analyze and generate improvements.
       st.caption("Generate optional evidence-cited notes for documentation improvements.")
 
       ai_status = get_ai_status()
-      if ai_status == "ready" and "fingerprint" in st.session_state:
+      if ai_status.is_ready and "fingerprint" in st.session_state:
         if st.button("Generate Documentation Review", key="ai_documentation"):
           def build_request():
             return build_documentation_context(snapshot, st.session_state["fingerprint"]) # type: ignore
@@ -3208,7 +3405,7 @@ IMPORTANT: Do not execute uploaded code. Only analyze and generate improvements.
         if "generated_doc" not in st.session_state:
           markdown_content = generate_markdown_report(
             snapshot=st.session_state["snapshot"],
-            fingerprint=st.session_state["fingerprint"],
+            fingerprint=display_fingerprint,
             routes=st.session_state.get("routes", []),
             reading_path=st.session_state.get("reading_path", []),
             component_cards=st.session_state.get("component_cards", []),
@@ -3241,7 +3438,7 @@ IMPORTANT: Do not execute uploaded code. Only analyze and generate improvements.
         st.caption("Optional notes to help refine the exported onboarding guide.")
 
         ai_status = get_ai_status()
-        if ai_status == "ready" and "fingerprint" in st.session_state:
+        if ai_status.is_ready and "fingerprint" in st.session_state:
           if st.button("Generate Export Review", key="ai_export_notes"):
             def build_request():
               return build_documentation_context(snapshot, st.session_state["fingerprint"]) # type: ignore
@@ -3287,12 +3484,13 @@ IMPORTANT: Do not execute uploaded code. Only analyze and generate improvements.
       st.dataframe(bob_work_df, use_container_width=True, hide_index=True)
 
       render_mini_label("Important Note", "shield", "green")
-      st.markdown("**Core RepoQuest analysis does not depend on AI at runtime.** Repository scanning, detection, graphing, reading paths, component cards, quiz generation, and export are deterministic.")
-      st.markdown("IBM Bob was used during development to help write code, tests, and documentation. Optional assistant features only run when explicitly configured and clicked.")
+      st.markdown("**Core RepoQuest evidence does not depend on AI at runtime.** Repository scanning, detection, graphing, routes, imports, ZIP safety, and file limits are deterministic.")
+      st.markdown("When optional AI is configured, AI Fusion runs after deterministic analysis and can reinterpret displayed conclusions only with cited evidence and validation. IBM Bob was used during development to help write code, tests, and documentation.")
 
       render_mini_label("Development Approach", "overview", "blue")
       approach_df = pd.DataFrame([
-        {"Principle": "Deterministic analysis", "Why it matters": "The same repository produces repeatable findings"},
+        {"Principle": "Deterministic evidence", "Why it matters": "The same repository produces repeatable facts and audit trails"},
+        {"Principle": "AI-first hybrid mode", "Why it matters": "Configured AI can challenge and improve interpretation without inventing facts"},
         {"Principle": "Framework heuristics", "Why it matters": "Detection is based on visible files and patterns"},
         {"Principle": "Simple ranked priorities", "Why it matters": "Reading paths and cards stay transparent"},
         {"Principle": "No runtime LLM dependency", "Why it matters": "The core demo works without secrets or external APIs"},

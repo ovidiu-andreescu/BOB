@@ -213,6 +213,228 @@ class AssistantJobStatus:
 
 
 @dataclass
+class AIFusionClaim:
+  """Evidence-backed AI interpretation claim."""
+  claim_type: str
+  value: str
+  confidence: float
+  evidence: list[str]
+  rationale: str
+
+  def to_dict(self) -> dict[str, object]:
+    """Return a JSON-serializable representation."""
+    return {
+      "claim_type": self.claim_type,
+      "value": self.value,
+      "confidence": self.confidence,
+      "evidence": list(self.evidence),
+      "rationale": self.rationale,
+    }
+
+  @classmethod
+  def from_dict(cls, data: dict[str, object]) -> "AIFusionClaim":
+    """Build a fusion claim from JSON."""
+    evidence = data.get("evidence", [])
+    return cls(
+      claim_type=str(data.get("claim_type", "")),
+      value=str(data.get("value", "")),
+      confidence=float(data.get("confidence", 0.0)),
+      evidence=[str(item) for item in evidence] if isinstance(evidence, list) else [],
+      rationale=str(data.get("rationale", "")),
+    )
+
+
+@dataclass
+class AIFusionOverride:
+  """AI proposal to override an interpretation-level deterministic output."""
+  target: str
+  original_value: object
+  proposed_value: object
+  confidence: float
+  evidence: list[str]
+  rationale: str
+  status: str = "pending"
+  warnings: list[str] = field(default_factory=list)
+
+  @property
+  def is_applied(self) -> bool:
+    """Return True when the override passed validation and was applied."""
+    return self.status == "applied"
+
+  def to_dict(self) -> dict[str, object]:
+    """Return a JSON-serializable representation."""
+    return {
+      "target": self.target,
+      "original_value": self.original_value,
+      "proposed_value": self.proposed_value,
+      "confidence": self.confidence,
+      "evidence": list(self.evidence),
+      "rationale": self.rationale,
+      "status": self.status,
+      "warnings": list(self.warnings),
+    }
+
+  @classmethod
+  def from_dict(cls, data: dict[str, object]) -> "AIFusionOverride":
+    """Build a fusion override from JSON."""
+    evidence = data.get("evidence", [])
+    warnings = data.get("warnings", [])
+    return cls(
+      target=str(data.get("target", "")),
+      original_value=data.get("original_value", ""),
+      proposed_value=data.get("proposed_value", ""),
+      confidence=float(data.get("confidence", 0.0)),
+      evidence=[str(item) for item in evidence] if isinstance(evidence, list) else [],
+      rationale=str(data.get("rationale", "")),
+      status=str(data.get("status", "pending")),
+      warnings=[str(item) for item in warnings] if isinstance(warnings, list) else [],
+    )
+
+
+@dataclass
+class AIFusionReport:
+  """Validated AI interpretation report layered over deterministic analysis."""
+  summary: str
+  claims: list[AIFusionClaim]
+  overrides: list[AIFusionOverride]
+  architecture_summary: str = ""
+  reading_path_notes: dict[str, str] = field(default_factory=dict)
+  component_notes: dict[str, str] = field(default_factory=dict)
+  risks: list[str] = field(default_factory=list)
+  recommendations: list[str] = field(default_factory=list)
+  provider: str = "unknown"
+  model: str = "unknown"
+  validation_status: str = "pending"
+  warnings: list[str] = field(default_factory=list)
+
+  @property
+  def applied_overrides(self) -> list[AIFusionOverride]:
+    """Return overrides that passed validation and changed final interpretation."""
+    return [override for override in self.overrides if override.is_applied]
+
+  def to_dict(self) -> dict[str, object]:
+    """Return a JSON-serializable representation."""
+    return {
+      "summary": self.summary,
+      "claims": [claim.to_dict() for claim in self.claims],
+      "overrides": [override.to_dict() for override in self.overrides],
+      "architecture_summary": self.architecture_summary,
+      "reading_path_notes": dict(self.reading_path_notes),
+      "component_notes": dict(self.component_notes),
+      "risks": list(self.risks),
+      "recommendations": list(self.recommendations),
+      "provider": self.provider,
+      "model": self.model,
+      "validation_status": self.validation_status,
+      "warnings": list(self.warnings),
+    }
+
+  @classmethod
+  def from_dict(cls, data: dict[str, object]) -> "AIFusionReport":
+    """Build a fusion report from JSON."""
+    claims = data.get("claims", [])
+    overrides = data.get("overrides", [])
+    reading_path_notes = data.get("reading_path_notes", {})
+    component_notes = data.get("component_notes", {})
+    risks = data.get("risks", [])
+    recommendations = data.get("recommendations", [])
+    warnings = data.get("warnings", [])
+    return cls(
+      summary=str(data.get("summary", "")),
+      claims=[
+        AIFusionClaim.from_dict(item)
+        for item in claims
+        if isinstance(item, dict)
+      ] if isinstance(claims, list) else [],
+      overrides=[
+        AIFusionOverride.from_dict(item)
+        for item in overrides
+        if isinstance(item, dict)
+      ] if isinstance(overrides, list) else [],
+      architecture_summary=str(data.get("architecture_summary", "")),
+      reading_path_notes={
+        str(key): str(value)
+        for key, value in reading_path_notes.items()
+      } if isinstance(reading_path_notes, dict) else {},
+      component_notes={
+        str(key): str(value)
+        for key, value in component_notes.items()
+      } if isinstance(component_notes, dict) else {},
+      risks=[str(item) for item in risks] if isinstance(risks, list) else [],
+      recommendations=[
+        str(item) for item in recommendations
+      ] if isinstance(recommendations, list) else [],
+      provider=str(data.get("provider", "unknown")),
+      model=str(data.get("model", "unknown")),
+      validation_status=str(data.get("validation_status", "pending")),
+      warnings=[str(item) for item in warnings] if isinstance(warnings, list) else [],
+    )
+
+
+@dataclass
+class FusedAnalysisResult:
+  """Final AI-first hybrid interpretation derived from deterministic evidence."""
+  mode: str
+  final_project_type: str
+  final_confidence: float
+  final_summary: str
+  final_entry_points: list[str]
+  report: AIFusionReport | None = None
+  source_id: str = ""
+  timestamp: str = ""
+
+  def __post_init__(self):
+    """Set timestamp if not provided."""
+    if not self.timestamp:
+      from datetime import datetime, timezone
+      self.timestamp = datetime.now(timezone.utc).isoformat()
+
+  @property
+  def is_ai_enhanced(self) -> bool:
+    """Return True when a valid AI fusion report is attached."""
+    return self.report is not None and self.report.validation_status in {"valid", "partial"}
+
+  @property
+  def applied_overrides(self) -> list[AIFusionOverride]:
+    """Return applied AI overrides."""
+    if not self.report:
+      return []
+    return self.report.applied_overrides
+
+  def to_dict(self) -> dict[str, object]:
+    """Return a JSON-serializable representation."""
+    return {
+      "mode": self.mode,
+      "final_project_type": self.final_project_type,
+      "final_confidence": self.final_confidence,
+      "final_summary": self.final_summary,
+      "final_entry_points": list(self.final_entry_points),
+      "report": self.report.to_dict() if self.report else None,
+      "source_id": self.source_id,
+      "timestamp": self.timestamp,
+    }
+
+  @classmethod
+  def deterministic(
+      cls,
+      project_type: str,
+      confidence: float,
+      summary: str,
+      entry_points: list[str],
+      source_id: str = "",
+  ) -> "FusedAnalysisResult":
+    """Create a deterministic fallback fusion result."""
+    return cls(
+      mode="deterministic",
+      final_project_type=project_type,
+      final_confidence=confidence,
+      final_summary=summary,
+      final_entry_points=list(entry_points),
+      source_id=source_id,
+    )
+
+
+@dataclass
 class GeneratedDocPage:
   """AI-generated documentation page with validation."""
   title: str
