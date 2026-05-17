@@ -1,8 +1,16 @@
 """RepoQuest - Turn unfamiliar repos into guided onboarding journeys."""
 
+import sys
+from pathlib import Path
+
+# Streamlit Community Cloud executes this file from app/, so add the repo root
+# before importing the local repoquest package.
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+  sys.path.insert(0, str(PROJECT_ROOT))
+
 import streamlit as st
 import pandas as pd
-from pathlib import Path
 import tempfile
 from html import escape
 import re
